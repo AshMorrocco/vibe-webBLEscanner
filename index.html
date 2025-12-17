@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BLE Live Monitor</title>
+    <title>BLE Monitor</title>
     <style>
         :root {
             --bg-color: #121212;
             --card-bg: #1e1e1e;
             --accent: #03dac6;
+            --warn: #cf6679;
             --text-main: #ffffff;
             --text-dim: #bbbbbb;
         }
@@ -40,6 +41,7 @@
             background: #333;
             color: #888;
             margin-left: 10px;
+            transition: all 0.3s;
         }
         .status-badge.active { background: #003d33; color: var(--accent); border: 1px solid var(--accent); }
 
@@ -54,12 +56,12 @@
             transition: all 0.2s;
         }
         button:hover { background: rgba(3, 218, 198, 0.1); }
-        button:disabled { border-color: #444; color: #444; cursor: not-allowed; }
+        button:disabled { border-color: #444; color: #444; cursor: not-allowed; opacity: 0.5; }
 
         /* Grid Layout */
         #device-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 12px;
         }
 
@@ -70,30 +72,50 @@
             border: 1px solid #333;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
+            transition: border-color 0.2s;
         }
+        .card.fresh { border-color: var(--accent); }
 
+        /* Card Internals */
         .card-header {
             display: flex;
             justify-content: space-between;
-            font-weight: bold;
-            color: var(--accent);
+            align-items: center;
+        }
+        .device-name { font-weight: bold; color: var(--accent); font-size: 1rem; }
+        .packet-count { 
+            font-family: monospace; 
+            font-size: 0.8rem; 
+            background: #333; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            color: #fff;
         }
 
-        .card-id { font-family: monospace; font-size: 0.75rem; color: #666; }
+        .card-center {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #666;
+            text-align: center;
+            background: #181818;
+            padding: 4px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+        }
         
         /* RSSI Visuals */
         .rssi-container {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-top: 5px;
+            margin-top: 2px;
         }
         .meter {
             flex-grow: 1;
-            height: 4px;
+            height: 6px;
             background: #333;
-            border-radius: 2px;
+            border-radius: 3px;
             overflow: hidden;
         }
         .fill { height: 100%; background: var(--accent); transition: width 0.2s; }
@@ -114,10 +136,6 @@
     </div>
 </header>
 
-<div id="instruction" style="background:#332b00; color:#ffd500; padding:10px; margin-bottom:20px; font-size:0.9rem; border-radius:4px; display:none;">
-    <strong>Tip:</strong> If a popup asks you to pair, just click <strong>Cancel</strong>. The scanner will start automatically after.
-</div>
-
 <div id="device-grid"></div>
 
 <script>
@@ -125,129 +143,100 @@
     const btnStop = document.getElementById('btn-stop');
     const statusBadge = document.getElementById('status');
     const grid = document.getElementById('device-grid');
-    const instruction = document.getElementById('instruction');
 
     let scan = null;
-    let audioCtx = null;
-    let oscillator = null;
-    let wakeLock = null;
+    let isScanning = false;
+    
+    // Store packet counts
+    const deviceCounts = new Map(); 
 
-    // --- Audio Keep-Alive Logic ---
-    function startKeepAlive() {
-        // Create Audio Context if needed
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        
-        // Create a virtually silent oscillator (hum)
-        oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(10, audioCtx.currentTime); // 10Hz (Very low rumble)
-        gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime); // Extremely low volume
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        oscillator.start();
-        console.log("Audio keep-alive started.");
-    }
-
-    function stopKeepAlive() {
-        if (oscillator) {
-            oscillator.stop();
-            oscillator.disconnect();
-            oscillator = null;
-        }
-        if (audioCtx) {
-            audioCtx.close();
-            audioCtx = null;
-        }
-        console.log("Audio keep-alive stopped.");
-    }
-
-    // --- Wake Lock Logic ---
-    async function requestWakeLock() {
-        try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-                console.log("Screen Wake Lock active.");
-            }
-        } catch (err) {
-            console.error(`${err.name}, ${err.message}`);
-        }
-    }
-
-    async function releaseWakeLock() {
-        if (wakeLock) {
-            await wakeLock.release();
-            wakeLock = null;
-        }
-    }
-
-    // --- Main Scanning Logic ---
+    // --- Main Control Logic ---
     btnStart.addEventListener('click', async () => {
-        instruction.style.display = 'block';
-        
         try {
-            // 1. Start Keep-Alive mechanisms immediately on user gesture
-            startKeepAlive();
-            await requestWakeLock();
-
-            // 2. Hardware Wake Up (The "Double Click" trick)
+            // 1. Hardware Wake Up (The "Double Click" trick)
             try {
                 await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
             } catch (e) {
                 // Expected user cancellation
             }
 
-            // 3. Start Real Scan
+            // 2. Start Real Scan
             scan = await navigator.bluetooth.requestLEScan({
                 acceptAllAdvertisements: true,
                 keepRepeatedDevices: true
             });
 
-            // Update UI
-            statusBadge.textContent = "Scanning Active";
-            statusBadge.classList.add('active');
-            btnStart.disabled = true;
-            btnStop.disabled = false;
-            instruction.style.display = 'none';
-
+            isScanning = true;
+            
+            // Explicitly set buttons for "Running" state
+            updateUIState(true);
+            
             navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
 
         } catch (error) {
             console.error(error);
             alert("Scan failed to start: " + error);
-            stopKeepAlive();
-            releaseWakeLock();
+            updateUIState(false);
         }
     });
 
-    btnStop.addEventListener('click', async () => {
+    btnStop.addEventListener('click', stopScan);
+
+    function stopScan() {
         if (scan) {
-            scan.stop();
+            try {
+                scan.stop();
+            } catch(e) { console.log("Scan already stopped"); }
+            
             navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisement);
-            
-            // Clean up resources
-            stopKeepAlive();
-            await releaseWakeLock();
-            
-            statusBadge.textContent = "Stopped";
-            statusBadge.classList.remove('active');
+            scan = null;
+        }
+        isScanning = false;
+        
+        // Explicitly set buttons for "Stopped" state
+        updateUIState(false);
+    }
+
+    function updateUIState(running) {
+        if (running) {
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+            statusBadge.textContent = "Scanning Active";
+            statusBadge.classList.add("active");
+        } else {
             btnStart.disabled = false;
             btnStop.disabled = true;
+            statusBadge.textContent = "Idle";
+            statusBadge.classList.remove("active");
+        }
+    }
+
+    // --- Focus / Visibility Handling ---
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden && isScanning) {
+            stopScan();
         }
     });
 
+    window.addEventListener("blur", () => {
+        if (isScanning) {
+            stopScan();
+        }
+    });
+
+    // --- UI Rendering ---
     function onAdvertisement(event) {
         const { device, rssi, txPower } = event;
         const id = device.id;
         const name = device.name || 'N/A';
         
+        // Update Count
+        const currentCount = (deviceCounts.get(id) || 0) + 1;
+        deviceCounts.set(id, currentCount);
+
         let card = document.getElementById(id);
         
+        // Create Card if it doesn't exist
         if (!card) {
             card = document.createElement('div');
             card.id = id;
@@ -255,14 +244,22 @@
             grid.appendChild(card);
         }
 
+        // Add 'fresh' class for visual feedback (CSS border flash)
+        card.classList.remove('fresh');
+        void card.offsetWidth; // Trigger reflow
+        card.classList.add('fresh');
+
         const percent = Math.min(Math.max((rssi + 100) * 1.5, 0), 100);
 
+        // Render Card Content
         card.innerHTML = `
             <div class="card-header">
-                <span>${name}</span>
-                <span>${txPower ? txPower + ' dBm' : ''}</span>
+                <span class="device-name" title="${name}">${name}</span>
+                <span class="packet-count" title="Advertisements Received">Rx: ${currentCount}</span>
             </div>
-            <div class="card-id">${id}</div>
+            
+            <div class="card-center" title="Device ID / MAC">${id}</div>
+            
             <div class="rssi-container">
                 <div class="meter"><div class="fill" style="width:${percent}%"></div></div>
                 <div class="rssi-text">${rssi} dBm</div>
