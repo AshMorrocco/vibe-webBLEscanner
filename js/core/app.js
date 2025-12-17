@@ -1,15 +1,18 @@
 /**
  * Main Controller
+ * Refactored to use EventBus and Store for better separation of concerns.
  */
 import { initTheme } from '../theme.js';
-import * as BLE from '../ble.js';
+import { EventBus, EVENTS } from './bus.js';
+import * as Store from './store.js';
+import { LiveProvider } from '../adapters/ble.js';
 import * as UI from '../ui/main.js';
 import { getSortedAndFilteredList } from '../logic/filter.js';
 import { runTests } from '../test.js';
 import './types.js';
 
-// Central State
-const devices = new Map(); 
+// Global Provider Instance (Live or Replay)
+let provider = null;
 let rateInterval = null;
 const isTestMode = new URLSearchParams(window.location.search).has('test');
 
@@ -20,9 +23,10 @@ UI.setUIState(false, isTestMode);
 // Bind Inputs (Refresh logic)
 UI.bindInputEvents(() => refreshUI());
 
-// Bind Card Clicks (Modal logic) - THIS WAS MISSING
+// Bind Card Clicks (Modal logic)
 UI.bindCardClick((id) => {
-    const deviceData = devices.get(id);
+    // Fetch data directly from Store
+    const deviceData = Store.getDevices().get(id);
     if (deviceData) {
         UI.showDetails(deviceData);
     }
@@ -34,13 +38,36 @@ if (isTestMode) {
     runTests(isTestMode);
 }
 
-// 2. Event Handlers
+// 2. Wiring: Listen for Store Updates (Store -> UI)
+EventBus.addEventListener(EVENTS.DEVICE_UPDATED, (event) => {
+    const device = event.detail;
+    
+    // Update the specific card
+    UI.updateCard(device.id, device.name, device.rssi, device.stats);
+    
+    // Refresh grid sorting/filtering
+    refreshUI();
+
+    // Live update Detail Modal if open
+    if (UI.isModalOpenFor(device.id)) {
+        UI.showDetails(device);
+    }
+});
+
+// 3. User Controls
 const btnStart = document.getElementById('btn-start');
 const btnStop = document.getElementById('btn-stop');
 
 if (btnStart) btnStart.addEventListener('click', async () => {
     try {
-        await BLE.startBLE(onAdvertisement);
+        // Initialize the Data Source (Live BLE)
+        provider = new LiveProvider();
+        
+        // Start Scanning
+        // We pass a callback that pipes data directly into the Store.
+        // Logic Flow: Provider -> Store -> EventBus -> UI
+        await provider.start((packet) => Store.upsertDevice(packet));
+        
         UI.setUIState(true, isTestMode);
         rateInterval = setInterval(refreshRates, 1000);
     } catch (e) {
@@ -51,41 +78,22 @@ if (btnStart) btnStart.addEventListener('click', async () => {
 
 if (btnStop) btnStop.addEventListener('click', stop);
 
-// 3. Core Logic Loop
-function onAdvertisement(event) {
-    const { device, rssi, txPower, uuids, manufacturerData, serviceData } = event;
-    const id = device.id;
-    const name = device.name || 'N/A';
-    
-    // Update State
-    let data = devices.get(id);
-    if (!data) {
-        data = { 
-            id, name, rssi, lastSeen: Date.now(), 
-            stats: { total: 0, bucket: 0, rate: 0 },
-            raw: { uuids, manufacturerData, serviceData, txPower }
-        };
-        devices.set(id, data);
-    } else {
-        data.rssi = rssi;
-        data.lastSeen = Date.now();
-        data.raw = { uuids, manufacturerData, serviceData, txPower };
+function stop() {
+    if (provider) {
+        provider.stop();
+        provider = null;
     }
-    
-    data.stats.total++;
-    data.stats.bucket++;
-
-    // UI Updates
-    UI.updateCard(id, name, rssi, data.stats);
-    refreshUI();
-
-    if (UI.isModalOpenFor(id)) {
-        UI.showDetails(data);
+    if (rateInterval) { 
+        clearInterval(rateInterval); 
+        rateInterval = null; 
     }
+    UI.setUIState(false, isTestMode);
 }
 
+// 4. Periodic Tasks
 function refreshRates() {
-    devices.forEach((data) => {
+    // Iterate over the Store's state
+    Store.getDevices().forEach((data) => {
         data.stats.rate = data.stats.bucket;
         data.stats.bucket = 0;
         UI.updateRateBadge(data.id, data.stats.total, data.stats.rate);
@@ -95,16 +103,13 @@ function refreshRates() {
 
 function refreshUI() {
     const config = UI.getFilterConfig();
-    const sortedList = getSortedAndFilteredList(devices, config);
+    // Retrieve map from Store
+    const devicesMap = Store.getDevices();
+    const sortedList = getSortedAndFilteredList(devicesMap, config);
     UI.render(sortedList);
 }
 
-function stop() {
-    BLE.stopBLE();
-    if (rateInterval) { clearInterval(rateInterval); rateInterval = null; }
-    UI.setUIState(false, isTestMode);
-}
-
+// 5. Lifecycle Management
 document.addEventListener("visibilitychange", () => { 
     if (document.hidden && !isTestMode && rateInterval) stop(); 
 });

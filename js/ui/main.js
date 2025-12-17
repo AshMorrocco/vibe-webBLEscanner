@@ -1,10 +1,13 @@
+import { EventBus, EVENTS } from '../core/bus.js';
+import * as Store from '../core/store.js';
+import { getSortedAndFilteredList } from '../logic/filter.js';
 import * as Card from './modules/card.js';
 import * as Modal from './modules/modal.js';
 import * as Controls from './modules/controls.js';
 
 const grid = document.getElementById('device-grid');
 
-// --- Re-Exports ---
+// --- Exports (Preserve API for now) ---
 export const updateCard = Card.updateCard;
 export const updateRateBadge = Card.updateRateBadge;
 export const showDetails = Modal.showDetails;
@@ -13,15 +16,42 @@ export const setUIState = Controls.setUIState;
 export const enableTestModeUI = Controls.enableTestModeUI;
 export const getFilterConfig = Controls.getFilterConfig;
 
-/**
- * Binds DOM events for filtering/sorting inputs.
- */
+// --- 1. Event Subscription (Decoupling) ---
+// The UI now listens for changes directly. app.js triggers the update in Store, 
+// Store fires event, UI updates itself.
+EventBus.addEventListener(EVENTS.DEVICE_UPDATED, (event) => {
+    const device = event.detail;
+
+    // A. Visual Update (Granular)
+    Card.updateCard(device.id, device.name, device.rssi, device.stats);
+
+    // B. List Order Update (Full Refresh)
+    // We only re-sort/filter if the Grid exists
+    refreshGrid();
+
+    // C. Modal Update (Live)
+    if (Modal.isModalOpenFor(device.id)) {
+        Modal.showDetails(device);
+    }
+});
+
+function refreshGrid() {
+    const gridEl = document.getElementById('device-grid');
+    if (!gridEl) return; // Null Safety: Don't run logic if view is missing
+
+    const config = Controls.getFilterConfig();
+    const devicesMap = Store.getDevices();
+    const sortedList = getSortedAndFilteredList(devicesMap, config);
+    render(sortedList);
+}
+
+// --- 2. Input Binding ---
 export function bindInputEvents(callback) {
     const inputs = ['rssi-slider', 'filter-text', 'filter-type', 'sort-type'];
     
     inputs.forEach(id => {
         const el = document.getElementById(id);
-        if (!el) return;
+        if (!el) return; // Null Safety
 
         const type = (id.includes('text') || id.includes('slider')) ? 'input' : 'change';
         
@@ -30,7 +60,9 @@ export function bindInputEvents(callback) {
                 const label = document.getElementById('rssi-val');
                 if (label) label.textContent = e.target.value;
             }
-            callback(); 
+            // Trigger refresh immediately on input
+            refreshGrid();
+            if (callback) callback(); 
         });
     });
 
@@ -38,17 +70,17 @@ export function bindInputEvents(callback) {
     if (sortBtn) {
         sortBtn.addEventListener('click', () => {
             Controls.toggleSortOrder(); 
-            callback(); 
+            refreshGrid();
+            if (callback) callback();
         });
     }
 }
 
-/**
- * Binds clicks on the Grid to a callback (Event Delegation).
- */
+// --- 3. Click Binding ---
 export function bindCardClick(onCardClick) {
-    if (grid) {
-        grid.addEventListener('click', (e) => {
+    const gridEl = document.getElementById('device-grid');
+    if (gridEl) {
+        gridEl.addEventListener('click', (e) => {
             const card = e.target.closest('.card');
             if (card && card.id) {
                 onCardClick(card.id);
@@ -57,26 +89,23 @@ export function bindCardClick(onCardClick) {
     }
 }
 
-/**
- * Renders the device list using Lazy Sorting to prevent click-thrashing.
- */
+// --- 4. Rendering Logic ---
 export function render(deviceList) {
+    const gridEl = document.getElementById('device-grid');
+    if (!gridEl) return;
+
     const visibleIds = new Set(deviceList.map(d => d.id));
 
-    // 1. Manage Visibility 
-    // We iterate over the REAL DOM children to hide/show them.
-    if(grid) {
-        Array.from(grid.children).forEach(card => {
-            if (visibleIds.has(card.id)) {
-                card.classList.remove('hidden');
-            } else {
-                card.classList.add('hidden');
-            }
-        });
-    }
+    // Manage Visibility
+    Array.from(gridEl.children).forEach(card => {
+        if (visibleIds.has(card.id)) {
+            card.classList.remove('hidden');
+        } else {
+            card.classList.add('hidden');
+        }
+    });
 
-    // 2. Manage Order (Smart Reorder)
-    // Only move elements if they are out of place. This preserves click events.
+    // Manage Order (Smart Reorder)
     let predecessor = null;
 
     deviceList.forEach(device => {
@@ -84,13 +113,10 @@ export function render(deviceList) {
         if (!card) return;
 
         if (predecessor === null) {
-            // This card should be the very first child
-            if (grid.firstElementChild !== card) {
-                grid.prepend(card);
+            if (gridEl.firstElementChild !== card) {
+                gridEl.prepend(card);
             }
         } else {
-            // This card should follow the predecessor.
-            // checking 'nextElementSibling' ensures we only move it if it's not already there.
             if (predecessor.nextElementSibling !== card) {
                 predecessor.after(card);
             }
