@@ -12,8 +12,9 @@ Built with Vanilla JavaScript (ES Modules), HTML5, and CSS3. No build tools or e
     * Filter by Name, UUID, or Minimum Signal Strength (RSSI Slider).
     * Sort by Signal, Last Seen, Name, or Packet Rate.
 * **Theming:** Built-in Dark/Light mode and dynamic color accent picker.
-* **Focus Guard:** Automatically handles browser security restrictions by pausing scans when the window loses focus.
 * **Zero Dependencies:** Runs entirely on standard browser APIs.
+* **Smart Compatibility Check:** Proactively detects if your browser supports Web Bluetooth and if the required flags are enabled, offering instant fix instructions.
+* **Modular Architecture:** Built on an Event-Driven (Pub/Sub) architecture with strict separation of Logic, State, and UI for high reliability and easy extensibility.
 
 ## 🚀 Getting Started
 
@@ -26,6 +27,7 @@ Built with Vanilla JavaScript (ES Modules), HTML5, and CSS3. No build tools or e
     * Set it to **Enabled**.
     * Relaunch your browser.
     * *Note: This is required for the `requestLEScan` (passive scanning) API.*
+    > Note: The application includes a built-in compatibility checker that will warn you on launch if these flags are missing or if your browser is unsupported.
 
 ### Installation & Running
 
@@ -52,16 +54,29 @@ Since this project uses **ES Modules** (`import`/`export`), it cannot be run by 
 ## 📂 Project Structure
 
 ```text
+## 📂 Project Structure
+
+```text
+text
 /ble-monitor
-├── index.html       # Main entry point and layout
+├── index.html           # Main entry point and layout
 ├── css/
-│   └── style.css    # All styling, themes, and responsive design
+│   └── style.css        # All styling, themes, and responsive design
 └── js/
-    ├── app.js       # Main controller, event loop, and initialization
-    ├── ble.js       # Bluetooth API interaction and connection logic
-    ├── ui.js        # DOM manipulation, card rendering, and sorting logic
-    ├── theme.js     # Dark/Light mode and color persistence handling
-    └── test.js      # Self-contained automated test suite
+    ├── core/            # Application Kernel
+    │   ├── app.js       # Bootstrapper (Wiring Store -> Bus -> UI)
+    │   ├── bus.js       # Event Bus (Pub/Sub)
+    │   └── store.js     # Centralized State Management
+    ├── adapters/        # Data Sources
+    │   ├── ble.js       # Web Bluetooth Adapter (LiveProvider)
+    │   └── replay.js    # Scanning Session Replay (Skeleton)
+    ├── logic/           # Pure Business Logic (Filtering, Sorting)
+    ├── ui/              # View Layer
+    │   ├── main.js      # Grid Controller & Event Subscriptions
+    │   └── modules/     # Reusable Components (Card, Modal, Controls)
+    ├── utils/           # Helpers (Hex conversion, etc.)
+    ├── theme.js         # Dark/Light mode and color persistence
+    └── test.js          # Automated Test Suite
 ```
 ## 🛠️ Usage Guide
 ### Starting a Scan
