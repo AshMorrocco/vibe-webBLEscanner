@@ -7,3 +7,4 @@
 - [ ] Add "Clear List" / "Forget Devices" button
 - [ ] Add Detail View (Click card to see Raw Hex Data/Service UUIDs)
 - [ ] Add RSSI Threshold Slider (Hide devices weaker than X dBm)
+- [x] Add testing /?test=true
