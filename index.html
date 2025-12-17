@@ -91,6 +91,8 @@
             padding: 2px 6px; 
             border-radius: 4px; 
             color: #fff;
+            min-width: 80px;
+            text-align: center;
         }
 
         .card-center {
@@ -146,19 +148,19 @@
 
     let scan = null;
     let isScanning = false;
+    let rateInterval = null;
     
-    // Store packet counts
-    const deviceCounts = new Map(); 
+    // Store stats: id -> { total: number, bucket: number, rate: number }
+    // 'bucket' collects packets over 1 second, then resets.
+    const deviceStats = new Map(); 
 
     // --- Main Control Logic ---
     btnStart.addEventListener('click', async () => {
         try {
-            // 1. Hardware Wake Up (The "Double Click" trick)
+            // 1. Hardware Wake Up
             try {
                 await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
-            } catch (e) {
-                // Expected user cancellation
-            }
+            } catch (e) { /* Expected user cancellation */ }
 
             // 2. Start Real Scan
             scan = await navigator.bluetooth.requestLEScan({
@@ -167,10 +169,11 @@
             });
 
             isScanning = true;
-            
-            // Explicitly set buttons for "Running" state
             updateUIState(true);
             
+            // 3. Start Rate Calculator (runs every 1 second)
+            rateInterval = setInterval(calculateRates, 1000);
+
             navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
 
         } catch (error) {
@@ -184,16 +187,17 @@
 
     function stopScan() {
         if (scan) {
-            try {
-                scan.stop();
-            } catch(e) { console.log("Scan already stopped"); }
-            
+            try { scan.stop(); } catch(e) { console.log("Scan already stopped"); }
             navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisement);
             scan = null;
         }
-        isScanning = false;
         
-        // Explicitly set buttons for "Stopped" state
+        if (rateInterval) {
+            clearInterval(rateInterval);
+            rateInterval = null;
+        }
+
+        isScanning = false;
         updateUIState(false);
     }
 
@@ -213,49 +217,73 @@
 
     // --- Focus / Visibility Handling ---
     document.addEventListener("visibilitychange", () => {
-        if (document.hidden && isScanning) {
-            stopScan();
-        }
+        if (document.hidden && isScanning) stopScan();
     });
 
     window.addEventListener("blur", () => {
-        if (isScanning) {
-            stopScan();
-        }
+        if (isScanning) stopScan();
     });
 
-    // --- UI Rendering ---
+    // --- Rate Calculator (Runs every 1s) ---
+    function calculateRates() {
+        deviceStats.forEach((stats, id) => {
+            // Move bucket count to rate, then reset bucket
+            stats.rate = stats.bucket;
+            stats.bucket = 0;
+
+            // Update just the badge text in the DOM to prevent full re-render flickering
+            const badge = document.getElementById(`badge-${id}`);
+            if (badge) {
+                badge.textContent = `Rx: ${stats.total} | ${stats.rate}/s`;
+            }
+        });
+    }
+
+    // --- Packet Handler ---
     function onAdvertisement(event) {
         const { device, rssi, txPower } = event;
         const id = device.id;
         const name = device.name || 'N/A';
         
-        // Update Count
-        const currentCount = (deviceCounts.get(id) || 0) + 1;
-        deviceCounts.set(id, currentCount);
+        // Update Stats
+        let stats = deviceStats.get(id);
+        if (!stats) {
+            stats = { total: 0, bucket: 0, rate: 0 };
+            deviceStats.set(id, stats);
+        }
+        stats.total++;
+        stats.bucket++;
 
         let card = document.getElementById(id);
         
-        // Create Card if it doesn't exist
+        // Create Card if new
         if (!card) {
             card = document.createElement('div');
             card.id = id;
             card.className = 'card';
             grid.appendChild(card);
+            // If new card, render full HTML immediately
+            renderCardContent(card, id, name, rssi, txPower, stats);
+        } else {
+            // If existing card, update content
+            renderCardContent(card, id, name, rssi, txPower, stats);
         }
 
-        // Add 'fresh' class for visual feedback (CSS border flash)
+        // Add 'fresh' visual flash
         card.classList.remove('fresh');
-        void card.offsetWidth; // Trigger reflow
+        void card.offsetWidth; 
         card.classList.add('fresh');
+    }
 
+    function renderCardContent(card, id, name, rssi, txPower, stats) {
         const percent = Math.min(Math.max((rssi + 100) * 1.5, 0), 100);
-
-        // Render Card Content
+        
+        // Note: We give the packet-count span a unique ID (badge-${id})
+        // so the setInterval timer can find it easily to update rate even if no packets come in.
         card.innerHTML = `
             <div class="card-header">
                 <span class="device-name" title="${name}">${name}</span>
-                <span class="packet-count" title="Advertisements Received">Rx: ${currentCount}</span>
+                <span id="badge-${id}" class="packet-count" title="Total | Rate">Rx: ${stats.total} | ${stats.rate}/s</span>
             </div>
             
             <div class="card-center" title="Device ID / MAC">${id}</div>
