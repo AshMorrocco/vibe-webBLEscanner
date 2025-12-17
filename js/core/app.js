@@ -38,6 +38,18 @@ if (isTestMode) {
     runTests(isTestMode);
 }
 
+// --- Compatibility Check (Run on Load) ---
+// This runs immediately to warn the user before they even click "Start"
+(function checkBrowser() {
+    const support = LiveProvider.checkSupport();
+    if (!support.ok) {
+        UI.showWarning(support.error, support.fix);
+        // Optional: Disable the start button
+        const btn = document.getElementById('btn-start');
+        if (btn) btn.disabled = true;
+    }
+})();
+
 // 2. Wiring: Listen for Store Updates (Store -> UI)
 EventBus.addEventListener(EVENTS.DEVICE_UPDATED, (event) => {
     const device = event.detail;

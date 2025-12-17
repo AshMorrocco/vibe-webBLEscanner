@@ -10,6 +10,32 @@ export class LiveProvider {
     }
 
     /**
+     * Checks if the browser environment supports the required features.
+     * @returns {Object} { ok: boolean, error: string, fix: string }
+     */
+    static checkSupport() {
+        // 1. Check Basic Bluetooth Support
+        if (!navigator.bluetooth) {
+            return {
+                ok: false,
+                error: "Web Bluetooth API is not available in this browser.",
+                fix: "Please use Chrome, Edge, or Opera on Desktop or Android."
+            };
+        }
+
+        // 2. Check for Passive Scan capability (Requires the Flag)
+        if (typeof navigator.bluetooth.requestLEScan !== 'function') {
+            return {
+                ok: false,
+                error: "Passive BLE Scanning is disabled.",
+                fix: "Go to chrome://flags/#enable-experimental-web-platform-features and set it to Enabled."
+            };
+        }
+
+        return { ok: true };
+    }
+    
+    /**
      * Starts the Bluetooth scan.
      * @param {Function} [callback] - Optional callback for direct data handling.
      */

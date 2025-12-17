@@ -124,3 +124,28 @@ export function render(deviceList) {
         predecessor = card;
     });
 }
+
+// --- 5. Compatibility Warning ---
+export function showWarning(message, fixInstructions = null) {
+    const banner = document.getElementById('compat-warning');
+    const msgEl = document.getElementById('compat-message');
+    const fixEl = document.getElementById('compat-fix');
+    
+    if (!banner) return;
+
+    msgEl.textContent = message;
+    
+    if (fixInstructions) {
+        fixEl.textContent = fixInstructions;
+        fixEl.style.display = 'block';
+    } else {
+        fixEl.style.display = 'none';
+    }
+
+    banner.classList.remove('hidden');
+}
+
+export function hideWarning() {
+    const banner = document.getElementById('compat-warning');
+    if (banner) banner.classList.add('hidden');
+}

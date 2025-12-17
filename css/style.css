@@ -220,3 +220,29 @@ input[type="range"] {
 /* Make cards look clickable */
 .card { cursor: pointer; }
 .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+
+/* Add to css/style.css */
+#compat-warning {
+    background-color: rgba(207, 102, 121, 0.2); /* Red tint */
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+#compat-warning.hidden {
+    display: none;
+}
+
+.fix-instructions {
+    margin-top: 8px;
+    color: var(--text-main);
+    font-family: monospace;
+    background: rgba(0,0,0,0.3);
+    padding: 8px;
+    border-radius: 4px;
+    user-select: text; /* Allow copying */
+}
