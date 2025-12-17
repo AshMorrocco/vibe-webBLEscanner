@@ -30,7 +30,6 @@ export function runTests(ui, isTestMode) {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     // --- HELPER: Trigger Event ---
-    // Simulates a user changing an input
     const triggerInput = (id, value, eventType = 'input') => {
         const el = document.getElementById(id);
         el.value = value;
@@ -57,8 +56,8 @@ export function runTests(ui, isTestMode) {
 
         // 3. Inject Data (Standard)
         if (mockListener) {
-            mockListener({ device: { id: "TEST_A", name: "Alpha Device" }, rssi: -50 });
-            mockListener({ device: { id: "TEST_Z", name: "Zebra Device" }, rssi: -90 });
+            mockListener({ device: { id: "TEST_A", name: "Alpha Device" }, rssi: -50, raw: {} });
+            mockListener({ device: { id: "TEST_Z", name: "Zebra Device" }, rssi: -90, raw: {} });
             log("Injected 2 mock devices (Alpha & Zebra)", true);
         } else log("Listener missing", false);
 
@@ -67,22 +66,17 @@ export function runTests(ui, isTestMode) {
             log("Cards rendered", true);
         } else log("Cards missing", false);
 
-        // --- NEW TESTS START HERE ---
-
         // 4. Test Filtering (RSSI)
-        // Set slider to -80. Zebra (-90) should hide. Alpha (-50) should stay.
         log("Testing RSSI Filter...", true);
         triggerInput('rssi-slider', '-80');
-        await sleep(100); // Wait for DOM update
+        await sleep(100); 
         
         const cardA = document.getElementById("TEST_A");
         const cardZ = document.getElementById("TEST_Z");
 
         if (!cardA.classList.contains('hidden') && cardZ.classList.contains('hidden')) {
             log("RSSI Filter logic correct (Weak signal hidden)", true);
-        } else {
-            log("RSSI Filter failed. Check classList.", false);
-        }
+        } else log("RSSI Filter failed. Check classList.", false);
 
         // Reset Filter
         triggerInput('rssi-slider', '-100');
@@ -95,38 +89,29 @@ export function runTests(ui, isTestMode) {
 
         if (cardA.classList.contains('hidden') && !cardZ.classList.contains('hidden')) {
             log("Text Filter logic correct ('Zebra' showed only Zebra)", true);
-        } else {
-            log("Text Filter failed.", false);
-        }
+        } else log("Text Filter failed.", false);
         
         // Reset Text
         triggerInput('filter-text', '');
         await sleep(50);
 
         // 6. Test Sorting (Name)
-        // Select 'name' sort. Alpha should be first child, Zebra second.
         log("Testing Sorting (Name)...", true);
         triggerInput('sort-type', 'name', 'change');
         
-        // Ensure Ascending
         const sortBtn = document.getElementById('sort-order');
-        if(sortBtn.textContent === '⬇') sortBtn.click(); // Toggle to Asc if needed (Arrow logic depends on your impl)
+        if(sortBtn.textContent === '⬇') sortBtn.click(); // Toggle to Asc
         
-        // Force re-sort trigger
         triggerInput('sort-type', 'name', 'change'); 
         await sleep(50);
 
         const firstId = grid.firstElementChild.id;
-        if (firstId === 'TEST_A') {
-            log("Sorting correct (Alpha is first)", true);
-        } else {
-            log(`Sorting failed. First element is ${firstId}`, false);
-        }
+        if (firstId === 'TEST_A') log("Sorting correct (Alpha is first)", true);
+        else log(`Sorting failed. First element is ${firstId}`, false);
 
         // 7. Rate Calculation
-        // Send more packets to Alpha to test rate
-        mockListener({ device: { id: "TEST_A", name: "Alpha" }, rssi: -50 });
-        mockListener({ device: { id: "TEST_A", name: "Alpha" }, rssi: -50 });
+        mockListener({ device: { id: "TEST_A", name: "Alpha" }, rssi: -50, raw: {} });
+        mockListener({ device: { id: "TEST_A", name: "Alpha" }, rssi: -50, raw: {} });
         
         log("Waiting for rate calc (1.1s)...", true);
         await sleep(1100);
@@ -134,7 +119,57 @@ export function runTests(ui, isTestMode) {
         if (cardA.innerHTML.includes("3/s")) log("Rate correct (3/s)", true);
         else log("Rate failed", false);
 
-        // 8. Stop
+        // --- 8. NEW: Modal & Pause Tests ---
+        log("Testing Modal Logic...", true);
+        
+        // A. Open Modal for TEST_A
+        cardA.click();
+        await sleep(100);
+
+        const modal = document.getElementById('detail-modal');
+        const modalId = document.getElementById('modal-id');
+        const modalRssi = document.getElementById('modal-rssi');
+        const pauseBtn = document.getElementById('modal-pause');
+
+        if (!modal.classList.contains('hidden') && modalId.textContent === 'TEST_A') {
+            log("Modal opened for TEST_A", true);
+        } else log("Modal failed to open", false);
+
+        // B. Verify Live Update (Unpaused)
+        mockListener({ device: { id: "TEST_A", name: "Alpha Device" }, rssi: -40, raw: {} });
+        await sleep(50);
+        if (modalRssi.textContent.includes("-40")) log("Live update received (Unpaused)", true);
+        else log("Live update failed", false);
+
+        // C. Test Pause Button
+        pauseBtn.click(); // Click Pause
+        await sleep(50);
+        if (pauseBtn.textContent.includes("▶")) log("Pause button toggled UI", true);
+        else log("Pause button UI failed", false);
+
+        // D. Verify Blocked Update (Paused)
+        mockListener({ device: { id: "TEST_A", name: "Alpha Device" }, rssi: -10, raw: {} });
+        await sleep(50);
+        // Should STILL be -40, NOT -10
+        if (modalRssi.textContent.includes("-40")) log("Live update blocked (Paused)", true);
+        else log("Pause logic failed! Updated to " + modalRssi.textContent, false);
+
+        // E. Test Reset on New Device
+        // Clicking TEST_Z should open Z and UNPAUSE automatically.
+        cardZ.click();
+        await sleep(100);
+
+        if (modalId.textContent === 'TEST_Z') log("Switched to TEST_Z", true);
+        
+        // Button should be back to Pause icon (⏸)
+        if (pauseBtn.textContent.includes("⏸")) log("Pause state reset automatically", true);
+        else log("Failed to reset pause state", false);
+
+        // Close Modal
+        document.getElementById('modal-close').click();
+        await sleep(100);
+
+        // 9. Stop
         btnStop.click();
         await sleep(100);
         if (!btnStart.disabled) log("Stop button reset UI", true);
@@ -147,5 +182,6 @@ export function runTests(ui, isTestMode) {
         close.style.marginTop = "20px";
         close.onclick = () => window.location.href = window.location.pathname;
         resultsDiv.appendChild(close);
+
     })();
 }

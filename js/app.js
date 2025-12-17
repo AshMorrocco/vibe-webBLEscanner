@@ -4,7 +4,7 @@ import * as BLE from './ble.js';
 import { runTests } from './test.js';
 
 // Central State
-const devices = new Map(); // Stores { id, name, rssi, lastSeen, stats }
+const devices = new Map(); 
 let rateInterval = null;
 const isTestMode = new URLSearchParams(window.location.search).has('test');
 
@@ -16,18 +16,21 @@ if (isTestMode) {
 }
 
 // --- Event Listeners ---
-document.getElementById('btn-start').addEventListener('click', async () => {
+const btnStart = document.getElementById('btn-start');
+const btnStop = document.getElementById('btn-stop');
+
+if (btnStart) btnStart.addEventListener('click', async () => {
     try {
         await BLE.startBLE(onAdvertisement);
         UI.setUIState(true, isTestMode);
-        rateInterval = setInterval(refreshLoop, 1000); // 1s loop for Rates & Sorting
+        rateInterval = setInterval(refreshLoop, 1000);
     } catch (e) {
         if(!isTestMode) alert(e);
         UI.setUIState(false, isTestMode);
     }
 });
 
-document.getElementById('btn-stop').addEventListener('click', stop);
+if (btnStop) btnStop.addEventListener('click', stop);
 
 // Control Inputs Listeners
 const rssiSlider = document.getElementById('rssi-slider');
@@ -36,21 +39,32 @@ const filterType = document.getElementById('filter-type');
 const sortType = document.getElementById('sort-type');
 const sortOrder = document.getElementById('sort-order');
 
-// Trigger UI updates immediately on input
-rssiSlider.addEventListener('input', (e) => {
+// Defensive Checks (prevents crash if HTML is missing)
+if (rssiSlider) rssiSlider.addEventListener('input', (e) => {
     document.getElementById('rssi-val').textContent = e.target.value;
     UI.applyFilters(devices); 
 });
-filterText.addEventListener('input', () => UI.applyFilters(devices));
-filterType.addEventListener('change', () => UI.applyFilters(devices));
 
-// Trigger Sort immediately on change
-sortType.addEventListener('change', () => UI.applySort(devices));
-sortOrder.addEventListener('click', () => {
+if (filterText) filterText.addEventListener('input', () => UI.applyFilters(devices));
+if (filterType) filterType.addEventListener('change', () => UI.applyFilters(devices));
+
+if (sortType) sortType.addEventListener('change', () => UI.applySort(devices));
+if (sortOrder) sortOrder.addEventListener('click', () => {
     const btn = document.getElementById('sort-order');
     btn.textContent = btn.textContent === '⬇' ? '⬆' : '⬇';
     btn.setAttribute('data-dir', btn.textContent === '⬇' ? 'desc' : 'asc');
     UI.applySort(devices);
+});
+
+// Click Handler for Details (Delegation)
+const grid = document.getElementById('device-grid');
+if (grid) grid.addEventListener('click', (e) => {
+    const card = e.target.closest('.card');
+    if (card) {
+        const id = card.id;
+        const deviceData = devices.get(id);
+        if (deviceData) UI.showDetails(deviceData);
+    }
 });
 
 function stop() {
@@ -59,9 +73,6 @@ function stop() {
     UI.setUIState(false, isTestMode);
 }
 
-// --- Loops & Handlers ---
-
-// This runs every 1 second
 function refreshLoop() {
     // 1. Calculate Rates
     devices.forEach((data) => {
@@ -69,14 +80,12 @@ function refreshLoop() {
         data.stats.bucket = 0;
         UI.updateRateBadge(data.id, data.stats.total, data.stats.rate);
     });
-
-    // 2. Re-apply sort (in case values changed, e.g. Ads/s or LastSeen)
-    // We throttle this to the 1s loop so the DOM isn't jumping around wildly
+    // 2. Sort
     UI.applySort(devices);
 }
 
 function onAdvertisement(event) {
-    const { device, rssi } = event;
+    const { device, rssi, txPower, uuids, manufacturerData, serviceData } = event;
     const id = device.id;
     const name = device.name || 'N/A';
     
@@ -84,27 +93,27 @@ function onAdvertisement(event) {
     let data = devices.get(id);
     if (!data) {
         data = { 
-            id, 
-            name, 
-            rssi, 
-            lastSeen: Date.now(), 
-            stats: { total: 0, bucket: 0, rate: 0 } 
+            id, name, rssi, lastSeen: Date.now(), 
+            stats: { total: 0, bucket: 0, rate: 0 },
+            raw: { uuids, manufacturerData, serviceData, txPower }
         };
         devices.set(id, data);
     } else {
         data.rssi = rssi;
         data.lastSeen = Date.now();
+        data.raw = { uuids, manufacturerData, serviceData, txPower };
     }
     
-    // Stats Update
     data.stats.total++;
     data.stats.bucket++;
 
-    // Render
     UI.updateCard(id, name, rssi, data.stats);
-    
-    // We apply filters on every packet to ensure new devices respect the rules
     UI.applyFilters(devices); 
+
+    // --- LIVE MODAL UPDATE ---
+    if (UI.isModalOpenFor(id)) {
+        UI.showDetails(data);
+    }
 }
 
 // Visibility Guard

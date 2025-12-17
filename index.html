@@ -27,22 +27,22 @@
     </div>
 
     <div class="control-group grow">
-        <input type="text" id="filter-text" placeholder="Filter...">
+        <input type="text" id="filter-text" placeholder="Filter by Name or ID...">
         <select id="filter-type">
             <option value="name">Name</option>
             <option value="id">UUID/ID</option>
-            </select>
+        </select>
     </div>
 
     <div class="control-group">
         <select id="sort-type">
             <option value="rssi">Signal (RSSI)</option>
             <option value="lastSeen">Last Recv</option>
-            <option value="name">Name</option>
-            <option value="total">Total Ads</option>
             <option value="rate">Ads/sec</option>
+            <option value="total">Total Ads</option>
+            <option value="name">Name</option>
         </select>
-        <button id="sort-order" title="Toggle Order" style="padding: 8px 12px;">⬇</button>
+        <button id="sort-order" title="Toggle Order" data-dir="desc" style="padding: 8px 12px;">⬇</button>
     </div>
 </section>
 
@@ -65,6 +65,35 @@
         </div>
         <div class="theme-row" style="margin-top:10px; padding-top:10px; border-top:1px solid #333">
              <a href="?test=true" style="color:var(--text-dim); text-decoration:none; font-size:0.8rem;">Run Test Suite</a>
+        </div>
+    </div>
+</div>
+
+<div id="detail-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="modal-header-actions">
+            <button id="modal-pause" class="icon-btn" title="Pause Live Updates">⏸</button>
+            <button id="modal-close" class="icon-btn" title="Close">&times;</button>
+        </div>
+        <h2 id="modal-title">Device Name</h2>
+        <div id="modal-id" class="modal-subtitle">ID: 00:00:00...</div>
+
+        <div class="detail-section">
+            <h3>Signal</h3>
+            <div class="detail-row"><span>RSSI:</span> <span id="modal-rssi">-</span></div>
+            <div class="detail-row"><span>Tx Power:</span> <span id="modal-tx">-</span></div>
+        </div>
+        <div class="detail-section">
+            <h3>Services (UUIDs)</h3>
+            <div id="modal-uuids" class="code-block">None</div>
+        </div>
+        <div class="detail-section">
+            <h3>Manufacturer Data</h3>
+            <div id="modal-mfg" class="code-block">None</div>
+        </div>
+        <div class="detail-section">
+            <h3>Service Data</h3>
+            <div id="modal-svc" class="code-block">None</div>
         </div>
     </div>
 </div>
