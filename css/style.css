@@ -1,0 +1,91 @@
+:root {
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-main: #ffffff;
+    --text-dim: #bbbbbb;
+    --border-dim: #333333;
+    --accent: #03dac6;
+    --accent-glow: rgba(3, 218, 198, 0.1);
+    --accent-badge: #003d33;
+    --warn: #cf6679;
+}
+
+body.light-mode {
+    --bg-color: #f0f2f5;
+    --card-bg: #ffffff;
+    --text-main: #1c1e21;
+    --text-dim: #65676b;
+    --border-dim: #dcdcdc;
+    --accent-badge: #e0f7fa;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    margin: 0;
+    padding: 20px;
+    padding-bottom: 80px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border-dim); padding-bottom: 20px; margin-bottom: 20px;
+}
+
+h1 { margin: 0; font-size: 1.2rem; letter-spacing: 1px; }
+
+.status-badge {
+    font-size: 0.8rem; padding: 4px 8px; border-radius: 4px;
+    background: var(--border-dim); color: var(--text-dim); margin-left: 10px; transition: all 0.3s;
+}
+.status-badge.active { background: var(--accent-badge); color: var(--accent); border: 1px solid var(--accent); }
+.status-badge.test-mode { background: #b98e04; color: #000; border: 1px solid #ffcc00; }
+
+button {
+    background: transparent; border: 1px solid var(--accent); color: var(--accent);
+    padding: 8px 24px; border-radius: 4px; cursor: pointer; font-weight: 600; transition: all 0.2s;
+}
+button:hover { background: var(--accent-glow); }
+button:disabled { border-color: var(--border-dim); color: var(--border-dim); cursor: not-allowed; opacity: 0.5; background: transparent; }
+
+#device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+
+.card {
+    background: var(--card-bg); border-radius: 6px; padding: 12px;
+    border: 1px solid var(--border-dim); display: flex; flex-direction: column; gap: 8px;
+    transition: border-color 0.2s, background-color 0.3s;
+}
+.card.fresh { border-color: var(--accent); }
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.device-name { font-weight: bold; color: var(--accent); font-size: 1rem; }
+.packet-count { 
+    font-family: monospace; font-size: 0.8rem; background: var(--border-dim); 
+    padding: 2px 6px; border-radius: 4px; color: var(--text-main); min-width: 80px; text-align: center;
+}
+.card-center {
+    font-family: monospace; font-size: 0.75rem; color: var(--text-dim); text-align: center;
+    background: rgba(128,128,128, 0.1); padding: 4px; border-radius: 4px; letter-spacing: 1px;
+}
+.rssi-container { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.meter { flex-grow: 1; height: 6px; background: var(--border-dim); border-radius: 3px; overflow: hidden; }
+.fill { height: 100%; background: var(--accent); transition: width 0.2s; }
+.rssi-text { font-family: monospace; font-size: 0.8rem; color: var(--text-dim); min-width: 60px; text-align: right; }
+
+#fab-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 10px; }
+#fab-btn { width: 50px; height: 50px; border-radius: 50%; background: var(--card-bg); border: 1px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); padding: 0; }
+#fab-btn svg { width: 24px; height: 24px; fill: currentColor; }
+#settings-menu { background: var(--card-bg); border: 1px solid var(--border-dim); padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: none; flex-direction: column; gap: 12px; min-width: 150px; }
+#settings-menu.visible { display: flex; }
+.theme-row { display: flex; justify-content: space-between; align-items: center; gap: 10px;}
+.swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.swatch:hover { transform: scale(1.1); }
+
+#test-results { 
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.95); z-index: 2000; padding: 40px; box-sizing: border-box; 
+    overflow-y: auto; font-family: monospace; 
+}
+.pass { color: #00ff9d; margin-bottom: 5px; }
+.fail { color: #ff0055; font-weight: bold; margin-bottom: 5px; }
