@@ -50,6 +50,53 @@ button {
 button:hover { background: var(--accent-glow); }
 button:disabled { border-color: var(--border-dim); color: var(--border-dim); cursor: not-allowed; opacity: 0.5; background: transparent; }
 
+/* --- Controls Bar --- */
+#controls-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-group.grow {
+    flex-grow: 1;
+    min-width: 200px;
+}
+
+/* Inputs */
+input[type="text"], select {
+    background: var(--bg-color);
+    border: 1px solid var(--border-dim);
+    color: var(--text-main);
+    padding: 8px;
+    border-radius: 4px;
+    outline: none;
+    font-size: 0.9rem;
+}
+
+input[type="text"] { width: 100%; }
+
+input[type="range"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+/* Visibility Utility */
+.card.hidden {
+    display: none !important;
+}
+
 #device-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 
 .card {

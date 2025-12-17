@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BLE Monitor</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -18,6 +19,32 @@
         <button id="btn-stop" disabled>Stop</button>
     </div>
 </header>
+
+<section id="controls-bar">
+    <div class="control-group">
+        <label for="rssi-slider" style="font-size:0.8rem; color:var(--text-dim)">Min RSSI: <span id="rssi-val">-100</span> dBm</label>
+        <input type="range" id="rssi-slider" min="-100" max="-20" value="-100">
+    </div>
+
+    <div class="control-group grow">
+        <input type="text" id="filter-text" placeholder="Filter...">
+        <select id="filter-type">
+            <option value="name">Name</option>
+            <option value="id">UUID/ID</option>
+            </select>
+    </div>
+
+    <div class="control-group">
+        <select id="sort-type">
+            <option value="rssi">Signal (RSSI)</option>
+            <option value="lastSeen">Last Recv</option>
+            <option value="name">Name</option>
+            <option value="total">Total Ads</option>
+            <option value="rate">Ads/sec</option>
+        </select>
+        <button id="sort-order" title="Toggle Order" style="padding: 8px 12px;">⬇</button>
+    </div>
+</section>
 
 <div id="device-grid"></div>
 <div id="test-results"></div>
