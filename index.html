@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLE Live Monitor</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent: #03dac6;
+            --text-main: #ffffff;
+            --text-dim: #bbbbbb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* Header & Controls */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; letter-spacing: 1px; }
+
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #333;
+            color: #888;
+            margin-left: 10px;
+        }
+        .status-badge.active { background: #003d33; color: var(--accent); border: 1px solid var(--accent); }
+
+        button {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:hover { background: rgba(3, 218, 198, 0.1); }
+        button:disabled { border-color: #444; color: #444; cursor: not-allowed; }
+
+        /* Grid Layout */
+        #device-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 12px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 6px;
+            padding: 12px;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .card-id { font-family: monospace; font-size: 0.75rem; color: #666; }
+        
+        /* RSSI Visuals */
+        .rssi-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        .meter {
+            flex-grow: 1;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .fill { height: 100%; background: var(--accent); transition: width 0.2s; }
+        .rssi-text { font-family: monospace; font-size: 0.8rem; color: var(--text-dim); min-width: 60px; text-align: right; }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="display:flex; align-items:center">
+        <h1>BLE Monitor</h1>
+        <span id="status" class="status-badge">Idle</span>
+    </div>
+    <div>
+        <button id="btn-start">Start Scanner</button>
+        <button id="btn-stop" disabled>Stop</button>
+    </div>
+</header>
+
+<div id="instruction" style="background:#332b00; color:#ffd500; padding:10px; margin-bottom:20px; font-size:0.9rem; border-radius:4px; display:none;">
+    <strong>Tip:</strong> If a popup asks you to pair, just click <strong>Cancel</strong>. The scanner will start automatically after.
+</div>
+
+<div id="device-grid"></div>
+
+<script>
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const statusBadge = document.getElementById('status');
+    const grid = document.getElementById('device-grid');
+    const instruction = document.getElementById('instruction');
+
+    let scan = null;
+    let audioCtx = null;
+    let oscillator = null;
+    let wakeLock = null;
+
+    // --- Audio Keep-Alive Logic ---
+    function startKeepAlive() {
+        // Create Audio Context if needed
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Create a virtually silent oscillator (hum)
+        oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(10, audioCtx.currentTime); // 10Hz (Very low rumble)
+        gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime); // Extremely low volume
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.start();
+        console.log("Audio keep-alive started.");
+    }
+
+    function stopKeepAlive() {
+        if (oscillator) {
+            oscillator.stop();
+            oscillator.disconnect();
+            oscillator = null;
+        }
+        if (audioCtx) {
+            audioCtx.close();
+            audioCtx = null;
+        }
+        console.log("Audio keep-alive stopped.");
+    }
+
+    // --- Wake Lock Logic ---
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log("Screen Wake Lock active.");
+            }
+        } catch (err) {
+            console.error(`${err.name}, ${err.message}`);
+        }
+    }
+
+    async function releaseWakeLock() {
+        if (wakeLock) {
+            await wakeLock.release();
+            wakeLock = null;
+        }
+    }
+
+    // --- Main Scanning Logic ---
+    btnStart.addEventListener('click', async () => {
+        instruction.style.display = 'block';
+        
+        try {
+            // 1. Start Keep-Alive mechanisms immediately on user gesture
+            startKeepAlive();
+            await requestWakeLock();
+
+            // 2. Hardware Wake Up (The "Double Click" trick)
+            try {
+                await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
+            } catch (e) {
+                // Expected user cancellation
+            }
+
+            // 3. Start Real Scan
+            scan = await navigator.bluetooth.requestLEScan({
+                acceptAllAdvertisements: true,
+                keepRepeatedDevices: true
+            });
+
+            // Update UI
+            statusBadge.textContent = "Scanning Active";
+            statusBadge.classList.add('active');
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+            instruction.style.display = 'none';
+
+            navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
+
+        } catch (error) {
+            console.error(error);
+            alert("Scan failed to start: " + error);
+            stopKeepAlive();
+            releaseWakeLock();
+        }
+    });
+
+    btnStop.addEventListener('click', async () => {
+        if (scan) {
+            scan.stop();
+            navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisement);
+            
+            // Clean up resources
+            stopKeepAlive();
+            await releaseWakeLock();
+            
+            statusBadge.textContent = "Stopped";
+            statusBadge.classList.remove('active');
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+        }
+    });
+
+    function onAdvertisement(event) {
+        const { device, rssi, txPower } = event;
+        const id = device.id;
+        const name = device.name || 'N/A';
+        
+        let card = document.getElementById(id);
+        
+        if (!card) {
+            card = document.createElement('div');
+            card.id = id;
+            card.className = 'card';
+            grid.appendChild(card);
+        }
+
+        const percent = Math.min(Math.max((rssi + 100) * 1.5, 0), 100);
+
+        card.innerHTML = `
+            <div class="card-header">
+                <span>${name}</span>
+                <span>${txPower ? txPower + ' dBm' : ''}</span>
+            </div>
+            <div class="card-id">${id}</div>
+            <div class="rssi-container">
+                <div class="meter"><div class="fill" style="width:${percent}%"></div></div>
+                <div class="rssi-text">${rssi} dBm</div>
+            </div>
+        `;
+    }
+</script>
+
+</body>
+</html>
