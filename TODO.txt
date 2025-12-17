@@ -2,7 +2,7 @@
 - [x] add average ads/s or even ads/min to the card view next to Rx in the format Rx: ## | ##/s
 - [ ] add filtering (by Name, RSSI, Manufacturer)
 - [ ] add sorting (name, last recieved, rssi)
-- [ ] add dark/light mode and/or a color selector primary color 
+- [x] add dark/light mode and/or a color selector primary color 
 - [ ] Add Data Export (Download CSV/JSON of scan session)
 - [ ] Add "Clear List" / "Forget Devices" button
 - [ ] Add Detail View (Click card to see Raw Hex Data/Service UUIDs)

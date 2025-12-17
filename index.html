@@ -6,12 +6,29 @@
     <title>BLE Monitor</title>
     <style>
         :root {
+            /* Default Dark Theme */
             --bg-color: #121212;
             --card-bg: #1e1e1e;
-            --accent: #03dac6;
-            --warn: #cf6679;
             --text-main: #ffffff;
             --text-dim: #bbbbbb;
+            --border-dim: #333333;
+            
+            /* Dynamic Accent Defaults (Cyan) */
+            --accent: #03dac6;
+            --accent-glow: rgba(3, 218, 198, 0.1);
+            --accent-badge: #003d33;
+
+            --warn: #cf6679;
+        }
+
+        /* Light Theme Overrides */
+        body.light-mode {
+            --bg-color: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-main: #1c1e21;
+            --text-dim: #65676b;
+            --border-dim: #dcdcdc;
+            --accent-badge: #e0f7fa; /* Lighter background for badge in light mode */
         }
 
         body {
@@ -20,6 +37,8 @@
             color: var(--text-main);
             margin: 0;
             padding: 20px;
+            padding-bottom: 80px; /* Space for FAB */
+            transition: background-color 0.3s, color 0.3s;
         }
 
         /* Header & Controls */
@@ -27,7 +46,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border-dim);
             padding-bottom: 20px;
             margin-bottom: 20px;
         }
@@ -38,12 +57,12 @@
             font-size: 0.8rem;
             padding: 4px 8px;
             border-radius: 4px;
-            background: #333;
-            color: #888;
+            background: var(--border-dim);
+            color: var(--text-dim);
             margin-left: 10px;
             transition: all 0.3s;
         }
-        .status-badge.active { background: #003d33; color: var(--accent); border: 1px solid var(--accent); }
+        .status-badge.active { background: var(--accent-badge); color: var(--accent); border: 1px solid var(--accent); }
 
         button {
             background: transparent;
@@ -55,8 +74,8 @@
             font-weight: 600;
             transition: all 0.2s;
         }
-        button:hover { background: rgba(3, 218, 198, 0.1); }
-        button:disabled { border-color: #444; color: #444; cursor: not-allowed; opacity: 0.5; }
+        button:hover { background: var(--accent-glow); }
+        button:disabled { border-color: var(--border-dim); color: var(--border-dim); cursor: not-allowed; opacity: 0.5; background: transparent; }
 
         /* Grid Layout */
         #device-grid {
@@ -69,28 +88,24 @@
             background: var(--card-bg);
             border-radius: 6px;
             padding: 12px;
-            border: 1px solid #333;
+            border: 1px solid var(--border-dim);
             display: flex;
             flex-direction: column;
             gap: 8px;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, background-color 0.3s;
         }
         .card.fresh { border-color: var(--accent); }
 
         /* Card Internals */
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
         .device-name { font-weight: bold; color: var(--accent); font-size: 1rem; }
         .packet-count { 
             font-family: monospace; 
             font-size: 0.8rem; 
-            background: #333; 
+            background: var(--border-dim); 
             padding: 2px 6px; 
             border-radius: 4px; 
-            color: #fff;
+            color: var(--text-main);
             min-width: 80px;
             text-align: center;
         }
@@ -98,30 +113,72 @@
         .card-center {
             font-family: monospace;
             font-size: 0.75rem;
-            color: #666;
+            color: var(--text-dim);
             text-align: center;
-            background: #181818;
+            background: rgba(128,128,128, 0.1);
             padding: 4px;
             border-radius: 4px;
             letter-spacing: 1px;
         }
         
         /* RSSI Visuals */
-        .rssi-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 2px;
-        }
-        .meter {
-            flex-grow: 1;
-            height: 6px;
-            background: #333;
-            border-radius: 3px;
-            overflow: hidden;
-        }
+        .rssi-container { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+        .meter { flex-grow: 1; height: 6px; background: var(--border-dim); border-radius: 3px; overflow: hidden; }
         .fill { height: 100%; background: var(--accent); transition: width 0.2s; }
         .rssi-text { font-family: monospace; font-size: 0.8rem; color: var(--text-dim); min-width: 60px; text-align: right; }
+
+        /* --- THEME FAB & MENU --- */
+        #fab-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column-reverse; /* Menu stacks above button */
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        #fab-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--card-bg);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 0; /* Override default button padding */
+        }
+        #fab-btn:hover { background: var(--accent); color: var(--bg-color); }
+        #fab-btn svg { width: 24px; height: 24px; fill: currentColor; }
+
+        #settings-menu {
+            background: var(--card-bg);
+            border: 1px solid var(--border-dim);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            gap: 12px;
+            min-width: 150px;
+        }
+        #settings-menu.visible { display: flex; }
+
+        .theme-row { display: flex; justify-content: space-between; align-items: center; gap: 10px;}
+        .theme-label { font-size: 0.9rem; font-weight: bold; color: var(--text-main); }
+        
+        /* Color Swatches */
+        .color-options { display: flex; gap: 8px; }
+        .swatch {
+            width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+        }
+        .swatch:hover { transform: scale(1.1); }
+        .swatch.selected { border-color: var(--text-main); }
 
     </style>
 </head>
@@ -140,45 +197,115 @@
 
 <div id="device-grid"></div>
 
+<div id="fab-container">
+    <button id="fab-btn" title="Settings">
+        <svg viewBox="0 0 24 24">
+            <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+        </svg>
+    </button>
+    
+    <div id="settings-menu">
+        <div class="theme-row">
+            <span class="theme-label">Theme</span>
+            <button id="theme-toggle" style="padding:4px 10px; font-size:0.8rem;">Light</button>
+        </div>
+        <div class="theme-row">
+            <span class="theme-label">Color</span>
+            <div class="color-options">
+                <div class="swatch" style="background:#03dac6;" data-color="#03dac6" data-bg="#003d33"></div>
+                <div class="swatch" style="background:#bb86fc;" data-color="#bb86fc" data-bg="#32004a"></div>
+                <div class="swatch" style="background:#ff9800;" data-color="#ff9800" data-bg="#4a2c00"></div>
+                <div class="swatch" style="background:#76ff03;" data-color="#76ff03" data-bg="#1b3300"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const btnStart = document.getElementById('btn-start');
     const btnStop = document.getElementById('btn-stop');
     const statusBadge = document.getElementById('status');
     const grid = document.getElementById('device-grid');
 
+    // Theme Elements
+    const fabBtn = document.getElementById('fab-btn');
+    const settingsMenu = document.getElementById('settings-menu');
+    const themeToggle = document.getElementById('theme-toggle');
+    const swatches = document.querySelectorAll('.swatch');
+
     let scan = null;
     let isScanning = false;
     let rateInterval = null;
-    
-    // Store stats: id -> { total: number, bucket: number, rate: number }
-    // 'bucket' collects packets over 1 second, then resets.
-    const deviceStats = new Map(); 
+    const deviceStats = new Map();
 
-    // --- Main Control Logic ---
+    // --- 1. Theming Logic ---
+
+    // Load saved preferences
+    const savedTheme = localStorage.getItem('ble-theme') || 'dark';
+    const savedColor = localStorage.getItem('ble-color') || '#03dac6';
+    const savedBg = localStorage.getItem('ble-color-bg') || '#003d33';
+
+    if (savedTheme === 'light') enableLightMode();
+    applyAccent(savedColor, savedBg);
+
+    // Toggle Menu
+    fabBtn.addEventListener('click', () => {
+        settingsMenu.classList.toggle('visible');
+    });
+
+    // Toggle Light/Dark
+    themeToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('light-mode')) {
+            disableLightMode();
+        } else {
+            enableLightMode();
+        }
+    });
+
+    function enableLightMode() {
+        document.body.classList.add('light-mode');
+        themeToggle.textContent = 'Dark';
+        localStorage.setItem('ble-theme', 'light');
+    }
+
+    function disableLightMode() {
+        document.body.classList.remove('light-mode');
+        themeToggle.textContent = 'Light';
+        localStorage.setItem('ble-theme', 'dark');
+    }
+
+    // Color Swatches
+    swatches.forEach(swatch => {
+        swatch.addEventListener('click', (e) => {
+            const color = e.target.dataset.color;
+            const bg = e.target.dataset.bg;
+            applyAccent(color, bg);
+        });
+    });
+
+    function applyAccent(color, bg) {
+        document.documentElement.style.setProperty('--accent', color);
+        document.documentElement.style.setProperty('--accent-glow', color + '1a'); // 10% opacity hex approximation
+        document.documentElement.style.setProperty('--accent-badge', bg);
+        
+        localStorage.setItem('ble-color', color);
+        localStorage.setItem('ble-color-bg', bg);
+    }
+
+    // --- 2. BLE Logic ---
+
     btnStart.addEventListener('click', async () => {
         try {
-            // 1. Hardware Wake Up
-            try {
-                await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
-            } catch (e) { /* Expected user cancellation */ }
-
-            // 2. Start Real Scan
-            scan = await navigator.bluetooth.requestLEScan({
-                acceptAllAdvertisements: true,
-                keepRepeatedDevices: true
-            });
+            try { await navigator.bluetooth.requestDevice({ acceptAllDevices: true }); } catch (e) {}
+            scan = await navigator.bluetooth.requestLEScan({ acceptAllAdvertisements: true, keepRepeatedDevices: true });
 
             isScanning = true;
             updateUIState(true);
-            
-            // 3. Start Rate Calculator (runs every 1 second)
             rateInterval = setInterval(calculateRates, 1000);
-
             navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
 
         } catch (error) {
-            console.error(error);
-            alert("Scan failed to start: " + error);
+            alert("Scan failed: " + error);
             updateUIState(false);
         }
     });
@@ -186,17 +313,8 @@
     btnStop.addEventListener('click', stopScan);
 
     function stopScan() {
-        if (scan) {
-            try { scan.stop(); } catch(e) { console.log("Scan already stopped"); }
-            navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisement);
-            scan = null;
-        }
-        
-        if (rateInterval) {
-            clearInterval(rateInterval);
-            rateInterval = null;
-        }
-
+        if (scan) { try { scan.stop(); } catch(e){} navigator.bluetooth.removeEventListener('advertisementreceived', onAdvertisement); scan = null; }
+        if (rateInterval) { clearInterval(rateInterval); rateInterval = null; }
         isScanning = false;
         updateUIState(false);
     }
@@ -215,79 +333,52 @@
         }
     }
 
-    // --- Focus / Visibility Handling ---
-    document.addEventListener("visibilitychange", () => {
-        if (document.hidden && isScanning) stopScan();
-    });
+    document.addEventListener("visibilitychange", () => { if (document.hidden && isScanning) stopScan(); });
+    window.addEventListener("blur", () => { if (isScanning) stopScan(); });
 
-    window.addEventListener("blur", () => {
-        if (isScanning) stopScan();
-    });
-
-    // --- Rate Calculator (Runs every 1s) ---
     function calculateRates() {
         deviceStats.forEach((stats, id) => {
-            // Move bucket count to rate, then reset bucket
             stats.rate = stats.bucket;
             stats.bucket = 0;
-
-            // Update just the badge text in the DOM to prevent full re-render flickering
             const badge = document.getElementById(`badge-${id}`);
-            if (badge) {
-                badge.textContent = `Rx: ${stats.total} | ${stats.rate}/s`;
-            }
+            if (badge) badge.textContent = `Rx: ${stats.total} | ${stats.rate}/s`;
         });
     }
 
-    // --- Packet Handler ---
     function onAdvertisement(event) {
-        const { device, rssi, txPower } = event;
+        const { device, rssi } = event;
         const id = device.id;
         const name = device.name || 'N/A';
         
-        // Update Stats
         let stats = deviceStats.get(id);
-        if (!stats) {
-            stats = { total: 0, bucket: 0, rate: 0 };
-            deviceStats.set(id, stats);
-        }
+        if (!stats) { stats = { total: 0, bucket: 0, rate: 0 }; deviceStats.set(id, stats); }
         stats.total++;
         stats.bucket++;
 
         let card = document.getElementById(id);
-        
-        // Create Card if new
         if (!card) {
             card = document.createElement('div');
             card.id = id;
             card.className = 'card';
             grid.appendChild(card);
-            // If new card, render full HTML immediately
-            renderCardContent(card, id, name, rssi, txPower, stats);
+            renderCardContent(card, id, name, rssi, stats);
         } else {
-            // If existing card, update content
-            renderCardContent(card, id, name, rssi, txPower, stats);
+            renderCardContent(card, id, name, rssi, stats);
         }
 
-        // Add 'fresh' visual flash
         card.classList.remove('fresh');
         void card.offsetWidth; 
         card.classList.add('fresh');
     }
 
-    function renderCardContent(card, id, name, rssi, txPower, stats) {
+    function renderCardContent(card, id, name, rssi, stats) {
         const percent = Math.min(Math.max((rssi + 100) * 1.5, 0), 100);
-        
-        // Note: We give the packet-count span a unique ID (badge-${id})
-        // so the setInterval timer can find it easily to update rate even if no packets come in.
         card.innerHTML = `
             <div class="card-header">
                 <span class="device-name" title="${name}">${name}</span>
-                <span id="badge-${id}" class="packet-count" title="Total | Rate">Rx: ${stats.total} | ${stats.rate}/s</span>
+                <span id="badge-${id}" class="packet-count">Rx: ${stats.total} | ${stats.rate}/s</span>
             </div>
-            
-            <div class="card-center" title="Device ID / MAC">${id}</div>
-            
+            <div class="card-center" title="ID">${id}</div>
             <div class="rssi-container">
                 <div class="meter"><div class="fill" style="width:${percent}%"></div></div>
                 <div class="rssi-text">${rssi} dBm</div>
