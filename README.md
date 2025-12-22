@@ -14,6 +14,8 @@ Built with Vanilla JavaScript (ES Modules), HTML5, and CSS3. No build tools or e
 * **Theming:** Built-in Dark/Light mode and dynamic color accent picker.
 * **Zero Dependencies:** Runs entirely on standard browser APIs.
 * **Smart Compatibility Check:** Proactively detects if your browser supports Web Bluetooth and if the required flags are enabled, offering instant fix instructions.
+* **Replay Playback:** Load a saved replay (.json) from Settings → Load Replay, then Start Replay to play back packets and visualize them in the UI.
+* **Recording & Save:** Start recording from the header control to capture advertisements and Stop & Save to download a replay file. The Recorder enforces a safety cap (default 10k packets).
 * **Modular Architecture:** Built on an Event-Driven (Pub/Sub) architecture with strict separation of Logic, State, and UI for high reliability and easy extensibility.
 
 ## 🚀 Getting Started
