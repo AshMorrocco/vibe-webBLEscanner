@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "name": "sample-session",
+    "created": 1703260000000,
+    "version": 1
+  },
+  "packets": [
+    { "t": 0, "device": { "id": "REPLAY_A", "name": "Replay A" }, "rssi": -50, "manufacturerData": { "0x004C": "4C 00 02 15" } },
+    { "t": 100, "device": { "id": "REPLAY_B", "name": "Replay B" }, "rssi": -80, "manufacturerData": {} },
+    { "t": 300, "device": { "id": "REPLAY_A" }, "rssi": -49, "manufacturerData": {} },
+    { "t": 500, "device": { "id": "REPLAY_B" }, "rssi": -79, "manufacturerData": {} }
+  ]
+}
