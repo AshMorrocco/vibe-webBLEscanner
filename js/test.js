@@ -21,6 +21,13 @@ export function runTests(isTestMode) {
         Object.defineProperty(navigator, 'bluetooth', { value: mockBluetooth, writable: true });
     } catch(e) { console.error("Mock injection failed", e); }
 
+    // Prevent actual file downloads during tests by stubbing Recorder.download
+    const _origRecorderDownload = Recorder.prototype.download;
+    Recorder.prototype.download = function(filename = 'replay.json', name = 'recording') {
+        // store download metadata on the instance for assertions without triggering a browser save
+        this._downloaded = { filename, name, json: this.getJSON(name) };
+    };
+
     // --- 2. TEST HELPERS ---
     const resultsDiv = document.getElementById('test-results');
     resultsDiv.style.display = 'block';
@@ -213,6 +220,23 @@ export function runTests(isTestMode) {
         document.getElementById('modal-close').click();
         await waitForUI(5);
 
+        // --- TEST: Tx Power sentinel handling ---
+        log("Testing Tx Power sentinel (-128) handling...", true);
+        try {
+            // Inject a device with txPower = -128 (sentinel)
+            mockListener({ device: { id: 'TX_TEST', name: 'Tx Sentinel' }, rssi: -60, txPower: -128, raw: {} });
+            await waitForUI(5);
+            const txCard = document.getElementById('TX_TEST');
+            if (!txCard) { log('Tx test device not rendered', false); }
+            else {
+                txCard.click();
+                await waitForUI(5);
+                const txEl = document.getElementById('modal-tx');
+                if (txEl && txEl.textContent.includes('N/A')) log('Tx sentinel shown as N/A', true);
+                else log('Tx sentinel not handled (modal shows: ' + (txEl ? txEl.textContent : 'missing') + ')', false);
+            }
+        } catch (e) { log('Tx sentinel test failed: ' + e.message, false); }
+
         // --- TEST: Replay Playback (App-level) ---
         try {
             // Fetch replay file blob and create a File so we can use the app's file input
@@ -355,6 +379,9 @@ export function runTests(isTestMode) {
 
         log("___ DONE ___", true);
         
+        // Restore patched methods to avoid affecting non-test usage
+        Recorder.prototype.download = _origRecorderDownload;
+
         const close = document.createElement('button');
         close.textContent = "Exit Tests";
         close.style.marginTop = "20px";

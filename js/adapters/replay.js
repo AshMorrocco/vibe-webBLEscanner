@@ -125,7 +125,8 @@ export class ReplayProvider {
     _normalizePacket(pkt) {
         const device = pkt.device || { id: 'UNKNOWN' };
         const rssi = pkt.rssi;
-        const txPower = pkt.txPower;
+        // Normalize sentinel -128 to null to indicate unknown/absent Tx Power
+        const txPower = (typeof pkt.txPower === 'number' && pkt.txPower !== -128) ? pkt.txPower : null;
         const uuids = pkt.uuids || [];
 
         const manufacturerData = this._parseRawMap(pkt.manufacturerData || {} , true);

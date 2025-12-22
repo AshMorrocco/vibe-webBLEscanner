@@ -28,8 +28,10 @@ export function upsertDevice(packet) {
         uuids: uuids || [],
         manufacturerData: serializeRawMap(manufacturerData, true),
         serviceData: serializeRawMap(serviceData, false),
-        txPower
-    };
+        // Some platforms use -128 as a sentinel (int8 min) when Tx Power is unknown.
+        // Normalize that to null so UI can display "N/A" instead of a misleading -128 dBm.
+        txPower: (typeof txPower === 'number' && txPower !== -128) ? txPower : null
+    }; 
 
     // 2. Update State
     let data = devices.get(id);
