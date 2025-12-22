@@ -1,5 +1,5 @@
-const btnStart = document.getElementById('btn-start');
-const btnStop = document.getElementById('btn-stop');
+const scanBtn = document.getElementById('btn-scan-toggle');
+const recordBtn = document.getElementById('btn-record-toggle');
 const statusBadge = document.getElementById('status');
 const sortBtn = document.getElementById('sort-order');
 
@@ -35,19 +35,24 @@ export function getFilterConfig() {
 }
 
 export function setUIState(running, isTestMode = false) {
-    if (running) {
-        if(btnStart) btnStart.disabled = true; 
-        if(btnStop) btnStop.disabled = false;
-        if(!isTestMode && statusBadge) { 
-            statusBadge.textContent = "Scanning Active"; 
-            statusBadge.classList.add("active"); 
+    // Toggle scan button label instead of enabling/disabling separate start/stop buttons
+    if (scanBtn) {
+        if (running) {
+            scanBtn.textContent = 'Stop scanning';
+            scanBtn.disabled = false;
+        } else {
+            scanBtn.textContent = 'Start scanning';
+            scanBtn.disabled = false;
         }
-    } else {
-        if(btnStart) btnStart.disabled = false; 
-        if(btnStop) btnStop.disabled = true;
-        if(!isTestMode && statusBadge) { 
-            statusBadge.textContent = "Idle"; 
-            statusBadge.classList.remove("active"); 
+    }
+
+    if(!isTestMode && statusBadge) {
+        if (running) {
+            statusBadge.textContent = "Scanning Active";
+            statusBadge.classList.add("active");
+        } else {
+            statusBadge.textContent = "Idle";
+            statusBadge.classList.remove("active");
         }
     }
 }
