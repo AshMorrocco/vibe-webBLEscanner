@@ -1,4 +1,4 @@
-import { bufferToHex } from '../../utils/helpers.js';
+import { bufferToHex, parseRawObject } from '../../utils/raw.js';
 
 // --- Internal Helper ---
 const get = (id) => document.getElementById(id);
@@ -91,20 +91,18 @@ export function showDetails(deviceData) {
     if (mfgContainer) {
         if (raw.manufacturerData && Object.keys(raw.manufacturerData).length > 0) {
             let html = '';
-            // Handle Object (serialized) or Map (raw)
-            const entries = raw.manufacturerData instanceof Map 
-                ? raw.manufacturerData.entries() 
+            // Ensure we work with a serialized object (key -> hex string)
+            const entries = (raw.manufacturerData instanceof Map) 
+                ? Array.from(raw.manufacturerData.entries()).map(([k,v]) => [k, bufferToHex(v)])
                 : Object.entries(raw.manufacturerData);
 
             for (const [key, value] of entries) {
-                 // Format key if it came from JSON object (already 0x...) or Map (needs formatting)
+                // Format key if it came from JSON object (already 0x...) or Map (needs formatting)
                 const label = key.toString().startsWith('0x') 
                     ? key 
                     : '0x' + key.toString(16).toUpperCase().padStart(4, '0');
                 
-                // If value is still DataView, bufferToHex handles it. If string, print it.
-                const valStr = typeof value === 'string' ? value : bufferToHex(value);
-                html += `<div><strong>${label}:</strong> ${valStr}</div>`;
+                html += `<div><strong>${label}:</strong> ${value}</div>`;
             }
             mfgContainer.innerHTML = html;
         } else { mfgContainer.textContent = "None"; }
@@ -115,13 +113,12 @@ export function showDetails(deviceData) {
     if (svcContainer) {
         if (raw.serviceData && Object.keys(raw.serviceData).length > 0) {
             let html = '';
-            const entries = raw.serviceData instanceof Map 
-                ? raw.serviceData.entries() 
+            const entries = (raw.serviceData instanceof Map)
+                ? Array.from(raw.serviceData.entries()).map(([k,v]) => [k, bufferToHex(v)])
                 : Object.entries(raw.serviceData);
 
             for (const [key, value] of entries) {
-                const valStr = typeof value === 'string' ? value : bufferToHex(value);
-                html += `<div><strong>${key}:</strong> ${valStr}</div>`;
+                html += `<div><strong>${key}:</strong> ${value}</div>`;
             }
             svcContainer.innerHTML = html;
         } else { svcContainer.textContent = "None"; }

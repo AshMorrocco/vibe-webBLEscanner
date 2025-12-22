@@ -6,6 +6,10 @@
 
 ## What you must know first ✅
 - Entry point: `index.html` loads `js/core/app.js` (wires everything).
+- API Quick Reference (TL;DR):
+  - `Store.upsertDevice(packet)` — packet shape: `{ device: { id, name }, rssi, txPower, uuids, manufacturerData, serviceData }` where `manufacturerData` and `serviceData` may be Maps of DataView or serialized `{ key: 'HEX ...' }` objects.
+  - `EventBus` events: `ADVERTISEMENT` (raw or normalized packet), `DEVICE_UPDATED` (Store-emitted device object), `SCAN_STATUS` (playback/scan running state), `RESET` (clear data).
+  - `utils/raw.js` exports helpers: `bufferToHex`, `hexToDataView`, `serializeRawMap`, `parseRawObject`, `toSafeId` — use these to convert formats and sanitize DOM ids.
 - State lives in `js/core/store.js` (single source of truth). Use `Store.getDevices()` or `Store.upsertDevice(packet)` when interacting with app data.
 - Communication uses an Event Bus: `js/core/bus.js` (constants in `EVENTS`). Typical events: `ADVERTISEMENT`, `DEVICE_UPDATED`, `SCAN_STATUS`, `RESET`.
 - UI updates are handled in `js/ui/*` and the small components under `js/ui/modules/` (card, modal, controls).
@@ -14,19 +18,33 @@
 - Always follow the unidirectional flow: Provider -> Store -> EventBus -> UI. Do not call `Store` from inside UI modules or call DOM from logic files.
 - Keep logic pure: functions in `js/logic/*` must not access `document` or `window` (see `getSortedAndFilteredList` in `logic/filter.js`).
 - Null-safety is required in UI modules: check `getElementById(...)` results before mutating DOM (pattern used throughout `js/ui/*`).
-- Persistable state: anything put into `store.js` must be JSON-serializable. Convert DataView/Map → hex strings/objects (see `serializeRawMap` in `js/core/store.js` and `bufferToHex` in `js/utils/helpers.js`).
+- Persistable state: anything put into `store.js` must be JSON-serializable. **Important:** `Store.getDevices()` now returns a shallow snapshot (new Map) to avoid accidental external mutation. Use `Store.getDeviceById(id)` to retrieve a defensive copy when you need to inspect or present device data. Use `utils/raw.js` helpers (`serializeRawMap`, `parseRawObject`, `bufferToHex`, `hexToDataView`, `toSafeId`) to convert between `Map<DataView>` and serializable `{ key: hexString }` forms. When writing adapters or tests prefer the serialized form for replay files and the Map/DataView form when emulating the real Web Bluetooth API.
 
 ## Adding a new data source (adapter) — exact expectations 📡
 - Place new adapters in `js/adapters/`. Follow the `LiveProvider` shape:
   - Expose `start(callback = null)` and `stop()`.
   - `start()` should either: dispatch `EventBus.dispatchEvent(new CustomEvent(EVENTS.ADVERTISEMENT, { detail: packet }))` or call the `callback(packet)` passed by `app.js`.
   - Packet shape expected by `Store.upsertDevice(packet)`: { device, rssi, txPower, uuids, manufacturerData, serviceData } where `device.id` and `device.name` are present.
+    - Example serialized packet (replay-friendly):
+      ```json
+      {
+        "t": 0,
+        "device": { "id": "AA:BB:CC", "name": "Beacon" },
+        "rssi": -60,
+        "txPower": null,
+        "uuids": [],
+        "manufacturerData": { "0x004C": "02 15 00 01" },
+        "serviceData": { "0000feaa-0000-1000-8000-00805f9b34fb": "01 02" }
+      }
+      ```
+  - When emitting real runtime events (from `LiveProvider`), use actual Web Bluetooth `Map<DataView>` formats; convert to serialized form for saving/loading replays using the `utils/raw.js` helpers.
 - Example from `js/adapters/ble.js` shows how to check browser support (`checkSupport()`) and how to add `advertisementreceived` listeners.
 
 ## Tests & QA 🧪
 - Built-in test mode: append `?test=true` to URL or click the gear & "Run Test Suite". Tests are implemented in `js/test.js`.
 - `runTests` injects a mock `navigator.bluetooth` and simulates packets; use it to validate UI logic, filtering, sorting, and rate calculations.
-- New tests were added to validate **Replay playback** and **Recorder** behavior (empty replay handling, stop-on-save, and recorder truncation). When changing adapter behavior, add corresponding tests to `js/test.js` and keep the app-level flow in mind (file input -> load -> Start Replay).
+- Tests are now more resilient: they avoid uncaught exceptions when UI elements are missing and assert on `data-device-id` values rather than sanitized DOM ids.
+- New tests were added to validate **Replay playback** and **Recorder** behavior (empty replay handling, stop-on-save, recorder truncation) and a unit test for **ReplayProvider pause/resume**. When changing adapter or replay behavior, add corresponding tests to `js/test.js` and validate pause/resume timing and loop behavior (file input -> load -> Start Replay).
 
 ## Recordings & Replays
 - **Saving:** Use the header **Start recording** toggle (or the Settings panel) to **Start Recording** and **Stop & Save**; the app will download a JSON replay file (`replay-<timestamp>.json`). Empty recordings are rejected and will display a warning.

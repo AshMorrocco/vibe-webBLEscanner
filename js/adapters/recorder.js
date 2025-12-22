@@ -1,5 +1,5 @@
 import { EventBus, EVENTS } from '../core/bus.js';
-import { bufferToHex } from '../utils/helpers.js';
+import { bufferToHex, serializeRawMap } from '../utils/raw.js';
 
 /**
  * Simple Recorder for capturing advertisement events and exporting as replay JSON.
@@ -79,14 +79,9 @@ export class Recorder {
     _serializeMapOrObj(mapOrObj, isManufacturer = false) {
         if (!mapOrObj) return {};
 
-        // If it's a Map (key -> DataView)
+        // If it's a Map (key -> DataView), reuse shared util
         if (mapOrObj instanceof Map) {
-            const obj = {};
-            mapOrObj.forEach((dataView, key) => {
-                const keyStr = isManufacturer ? ('0x' + Number(key).toString(16).toUpperCase().padStart(4, '0')) : key;
-                obj[keyStr] = bufferToHex(dataView);
-            });
-            return obj;
+            return serializeRawMap(mapOrObj, isManufacturer);
         }
 
         // Else if it's an object (serialized already)

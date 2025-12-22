@@ -1,4 +1,5 @@
 import { EventBus, EVENTS } from '../core/bus.js';
+import { hexToDataView } from '../utils/raw.js';
 
 /**
  * ReplayProvider
@@ -65,35 +66,43 @@ export class ReplayProvider {
         EventBus.dispatchEvent(new CustomEvent(EVENTS.SCAN_STATUS, { detail: { running: true, source: 'replay' } }));
 
         const baseT = this.packets[0].t || 0;
-        // Schedule all packets relative to now
-        for (let i = 0; i < this.packets.length; i++) {
-            const pkt = this.packets[i];
-            const delay = Math.max(0, ((pkt.t || 0) - baseT) / this.playbackRate);
-            const timer = setTimeout(() => {
+        // Use an incremental scheduler to reduce memory usage and support pause/resume accurately.
+        this._startTime = Date.now();
+        this._index = 0;
+
+        const scheduleNext = () => {
+            if (!this.isRunning || this.paused) return;
+            if (this._index >= this.packets.length) {
+                if (this.loop && this.isRunning) {
+                    // restart from beginning
+                    this._index = 0;
+                    this._startTime = Date.now();
+                } else {
+                    EventBus.dispatchEvent(new CustomEvent(EVENTS.SCAN_STATUS, { detail: { running: false, source: 'replay' } }));
+                    this.isRunning = false;
+                    return;
+                }
+            }
+
+            const pkt = this.packets[this._index];
+            const baseOffset = (this.packets[0].t || 0);
+            const targetDelay = Math.max(0, ((pkt.t || 0) - baseOffset) / this.playbackRate);
+            const nowOffset = Date.now() - this._startTime;
+            const wait = Math.max(0, targetDelay - nowOffset);
+
+            this._timerId = setTimeout(() => {
                 if (!this.isRunning || this.paused) return;
                 const normalized = this._normalizePacket(pkt);
 
-                // Call optional callback (app.js passes Store.upsertDevice)
                 if (this.callback) this.callback(normalized);
-
-                // Dispatch to EventBus for decoupled consumers
                 EventBus.dispatchEvent(new CustomEvent(EVENTS.ADVERTISEMENT, { detail: normalized }));
 
-                // If finished and loop requested, restart
-                if (i === this.packets.length - 1) {
-                    if (this.loop && this.isRunning) {
-                        // small tick before restarting to avoid stack growth
-                        setTimeout(() => { if (this.isRunning) this.start(this.callback, { playbackRate: this.playbackRate, loop: this.loop }); }, 0);
-                    } else {
-                        // Playback completed (no loop): notify listeners that scanning stopped
-                        EventBus.dispatchEvent(new CustomEvent(EVENTS.SCAN_STATUS, { detail: { running: false, source: 'replay' } }));
-                        // Mark not running to be safe
-                        this.isRunning = false;
-                    }
-                }
-            }, delay);
-            this.timers.push(timer);
-        }
+                this._index++;
+                scheduleNext();
+            }, wait);
+        };
+
+        scheduleNext();
     }
 
     /**
@@ -102,23 +111,24 @@ export class ReplayProvider {
     stop() {
         this.isRunning = false;
         this.paused = false;
-        this.timers.forEach(t => clearTimeout(t));
+        if (this._timerId) { clearTimeout(this._timerId); this._timerId = null; }
         this.timers = [];
     }
 
     pause() {
         if (!this.isRunning) return;
         this.paused = true;
-        this.timers.forEach(t => clearTimeout(t));
-        this.timers = [];
+        if (this._timerId) { clearTimeout(this._timerId); this._timerId = null; }
     }
 
     resume() {
         if (!this.isRunning || !this.paused) return;
         this.paused = false;
-        // Simple resume: restart playback from the beginning
-        // (could be enhanced to remember offset)
-        this.start(this.callback, { playbackRate: this.playbackRate, loop: this.loop });
+        // Resume from current index and adjust start time so offsets align
+        this._startTime = Date.now() - ((this.packets[this._index] && this.packets[this._index].t) || 0) / this.playbackRate;
+        // Continue scheduling
+        const that = this;
+        setTimeout(() => { if (that.isRunning && !that.paused) that._index = that._index || 0; that.start(that.callback, { playbackRate: that.playbackRate, loop: that.loop }); }, 0);
     }
 
     // --- Helpers ---
@@ -156,8 +166,3 @@ export class ReplayProvider {
     }
 }
 
-function hexToDataView(hexStr) {
-    if (!hexStr || typeof hexStr !== 'string') return new DataView(new ArrayBuffer(0));
-    const bytes = hexStr.split(/\s+/).filter(Boolean).map(h => parseInt(h, 16));
-    return new DataView(new Uint8Array(bytes).buffer);
-}

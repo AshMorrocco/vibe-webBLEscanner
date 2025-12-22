@@ -1,10 +1,10 @@
+// NOTE: helper functions moved to `js/utils/raw.js` to centralize raw-data conversion utilities.
+// Kept this file as a tiny shim for backward compatibility.
+import { bufferToHex as _bufferToHex } from './raw.js';
+
 /**
- * Converts a DataView (standard in Web Bluetooth API) to a hex string.
- * @param {DataView} dataView 
- * @returns {string} Space-separated hex string (e.g., "0A FF 10")
+ * shim--for legacy imports, re-export from raw.js
  */
 export function bufferToHex(dataView) {
-    return [...new Uint8Array(dataView.buffer)]
-        .map(b => b.toString(16).padStart(2, '0').toUpperCase())
-        .join(' ');
+    return _bufferToHex(dataView);
 }

@@ -4,6 +4,7 @@ import { getSortedAndFilteredList } from '../logic/filter.js';
 import * as Card from './modules/card.js';
 import * as Modal from './modules/modal.js';
 import * as Controls from './modules/controls.js';
+import { toSafeId } from '../utils/raw.js';
 
 const grid = document.getElementById('device-grid');
 
@@ -31,7 +32,8 @@ EventBus.addEventListener(EVENTS.DEVICE_UPDATED, (event) => {
 
     // C. Modal Update (Live)
     if (Modal.isModalOpenFor(device.id)) {
-        Modal.showDetails(device);
+        // Modal expects full device data object; pass a defensive copy
+        Modal.showDetails(JSON.parse(JSON.stringify(device)));
     }
 });
 
@@ -88,8 +90,8 @@ export function bindCardClick(onCardClick) {
     if (gridEl) {
         gridEl.addEventListener('click', (e) => {
             const card = e.target.closest('.card');
-            if (card && card.id) {
-                onCardClick(card.id);
+            if (card && card.dataset && card.dataset.deviceId) {
+                onCardClick(card.dataset.deviceId);
             }
         });
     }
@@ -104,7 +106,8 @@ export function render(deviceList) {
 
     // Manage Visibility
     Array.from(gridEl.children).forEach(card => {
-        if (visibleIds.has(card.id)) {
+        const deviceId = card.dataset && card.dataset.deviceId;
+        if (deviceId && visibleIds.has(deviceId)) {
             card.classList.remove('hidden');
         } else {
             card.classList.add('hidden');
@@ -115,7 +118,7 @@ export function render(deviceList) {
     let predecessor = null;
 
     deviceList.forEach(device => {
-        const card = document.getElementById(device.id);
+        const card = document.getElementById(toSafeId(device.id));
         if (!card) return;
 
         if (predecessor === null) {

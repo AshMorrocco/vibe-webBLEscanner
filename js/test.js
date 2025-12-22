@@ -2,6 +2,7 @@ import { ReplayProvider } from './adapters/replay.js';
 import { Recorder } from './adapters/recorder.js';
 import { EventBus, EVENTS } from './core/bus.js';
 import * as Store from './core/store.js';
+import { toSafeId } from './utils/raw.js';
 
 export function runTests(isTestMode) {
     if (!isTestMode) return;
@@ -94,39 +95,45 @@ export function runTests(isTestMode) {
 
         await waitForUI(5);
 
-        if (document.getElementById("TEST_A") && document.getElementById("TEST_Z")) {
+        if (document.getElementById(toSafeId("TEST_A")) && document.getElementById(toSafeId("TEST_Z"))) {
             log("Cards rendered", true);
         } else log("Cards missing", false);
 
         // --- TEST 4: Filtering (RSSI) ---
-        log("Testing RSSI Filter...", true);
-        triggerInput('rssi-slider', '-80');
-        await waitForUI(5);
-        
-        const cardA = document.getElementById("TEST_A");
-        const cardZ = document.getElementById("TEST_Z");
+        // Ensure cards exist before running dependent UI checks (avoid uncaught exceptions)
+        const safeGet = (id) => document.getElementById(toSafeId(id));
+        const cardA = safeGet("TEST_A");
+        const cardZ = safeGet("TEST_Z");
 
-        if (!cardA.classList.contains('hidden') && cardZ.classList.contains('hidden')) {
-            log("RSSI Filter logic correct (Weak signal hidden)", true);
-        } else log("RSSI Filter failed. Check classList.", false);
+        if (!cardA || !cardZ) {
+            log("SKIP: Cards missing — skipping RSSI/Text/Sorting tests", false);
+        } else {
+            log("Testing RSSI Filter...", true);
+            triggerInput('rssi-slider', '-80');
+            await waitForUI(5);
 
-        triggerInput('rssi-slider', '-100');
-        await waitForUI(5);
+            if (!cardA.classList.contains('hidden') && cardZ.classList.contains('hidden')) {
+                log("RSSI Filter logic correct (Weak signal hidden)", true);
+            } else log("RSSI Filter failed. Check classList.", false);
 
-        // --- TEST 5: Filtering (Text) ---
-        log("Testing Text Filter...", true);
-        triggerInput('filter-text', 'Zebra');
-        await waitForUI(5);
+            triggerInput('rssi-slider', '-100');
+            await waitForUI(5);
 
-        if (cardA.classList.contains('hidden') && !cardZ.classList.contains('hidden')) {
-            log("Text Filter logic correct ('Zebra' showed only Zebra)", true);
-        } else log("Text Filter failed.", false);
-        
-        triggerInput('filter-text', '');
-        await waitForUI(5);
+            // --- TEST 5: Filtering (Text) ---
+            log("Testing Text Filter...", true);
+            triggerInput('filter-text', 'Zebra');
+            await waitForUI(5);
 
-        // --- TEST 6: Sorting (Name) ---
-        log("Testing Sorting (Name)...", true);
+            if (cardA.classList.contains('hidden') && !cardZ.classList.contains('hidden')) {
+                log("Text Filter logic correct ('Zebra' showed only Zebra)", true);
+            } else log("Text Filter failed.", false);
+            
+            triggerInput('filter-text', '');
+            await waitForUI(5);
+
+            // --- TEST 6: Sorting (Name) ---
+            log("Testing Sorting (Name)...", true);
+        }
         triggerInput('sort-type', 'name', 'change');
         await waitForUI(5);
         
@@ -136,7 +143,7 @@ export function runTests(isTestMode) {
             await waitForUI(5);
         }
 
-        const firstId = grid.firstElementChild.id;
+        const firstId = grid.firstElementChild.dataset && grid.firstElementChild.dataset.deviceId;
         if (firstId === 'TEST_A') log("Sorting correct (Alpha is first)", true);
         else log(`Sorting failed. First element is ${firstId}`, false);
 
@@ -157,7 +164,7 @@ export function runTests(isTestMode) {
             await waitForUI(1);
 
             // 3. Check UI
-            const badge = document.getElementById('badge-TEST_A');
+            const badge = document.getElementById(`badge-${toSafeId('TEST_A')}`);
             if (badge) {
                 finalRateText = badge.textContent;
                 // We expect something like "Rx: 24 | 10/s"
@@ -226,7 +233,7 @@ export function runTests(isTestMode) {
             // Inject a device with txPower = -128 (sentinel)
             mockListener({ device: { id: 'TX_TEST', name: 'Tx Sentinel' }, rssi: -60, txPower: -128, raw: {} });
             await waitForUI(5);
-            const txCard = document.getElementById('TX_TEST');
+            const txCard = document.getElementById(toSafeId('TX_TEST'));
             if (!txCard) { log('Tx test device not rendered', false); }
             else {
                 txCard.click();
@@ -277,12 +284,12 @@ export function runTests(isTestMode) {
             startBtn.click();
 
             // Wait until a replay card appears or timeout (2s)
-            const found = await waitForCondition(() => document.getElementById('REPLAY_A') || document.getElementById('REPLAY_B'), 2000, 50);
+            const found = await waitForCondition(() => document.getElementById(toSafeId('REPLAY_A')) || document.getElementById(toSafeId('REPLAY_B')), 2000, 50);
             if (found) log('Replay packets rendered (app start)', true);
             else log('Replay failed: no cards after timeout', false);
 
             // Verify previous devices are cleared or hidden
-            const oldA = document.getElementById('TEST_A');
+            const oldA = document.getElementById(toSafeId('TEST_A'));
             if (!oldA) log('Old devices cleared', true);
             else if (oldA.classList.contains('hidden')) log('Old devices hidden', true);
             else log('Old devices not cleared', false);
@@ -300,6 +307,26 @@ export function runTests(isTestMode) {
         } catch (e) {
             log('Replay test skipped: ' + e.message, false);
         }
+
+        // --- TEST: ReplayProvider pause/resume (Unit) ---
+        log("Testing ReplayProvider pause/resume...", true);
+        try {
+            const rp = new ReplayProvider();
+            await rp.loadFromJSON({ packets: [ { t: 0, device: { id: 'PA1', name: 'P1' }, rssi: -50 }, { t: 200, device: { id: 'PA2', name: 'P2' }, rssi: -50 } ] });
+            let events = [];
+            await rp.start((pkt) => { events.push(pkt.device.id); }, { playbackRate: 1.0, loop: false });
+            // Pause quickly before packets are delivered
+            rp.pause();
+            await new Promise(r => setTimeout(r, 300));
+            if (events.length === 0) log('Pause blocked initial packets', true);
+            else log('Pause failed, received packets: ' + events.length, false);
+
+            // Resume and verify playback completes
+            rp.resume();
+            const resumed = await waitForCondition(() => events.length >= 2, 2000, 50);
+            if (resumed) log('Resume continued playback', true);
+            else log('Resume failed to continue playback (events: ' + events.length + ')', false);
+        } catch (e) { log('ReplayProvider pause/resume test failed: ' + e.message, false); }
 
         // --- Additional Tests: Recorder / Replay edge cases ---
         // Recorder UI behavior

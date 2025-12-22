@@ -1,3 +1,5 @@
+import { toSafeId } from '../../utils/raw.js';
+
 /**
  * Renders/Updates a single device card.
  * Null-safe: Checks if the grid and card elements exist before writing.
@@ -9,12 +11,15 @@ export function updateCard(id, name, rssi, stats) {
         // GUARD: If the grid view isn't active, do nothing
         if (!grid) return;
 
-        let card = document.getElementById(id);
+        // Use safe id when querying the DOM
+        const safeId = toSafeId(id);
+        let card = document.getElementById(safeId);
         
         // A. Create Card (First time only)
         if (!card) {
             card = document.createElement('div');
-            card.id = id;
+            card.id = safeId;
+            card.dataset.deviceId = id; // keep original id for lookup
             card.className = 'card';
             card.innerHTML = `
                 <div class="card-header">
@@ -42,7 +47,7 @@ export function updateCard(id, name, rssi, stats) {
         if (nameEl && nameEl.textContent !== name) nameEl.textContent = name;
         
         if (countEl) {
-            if (!countEl.id) countEl.id = `badge-${id}`;
+            if (!countEl.id) countEl.id = `badge-${safeId}`;
             countEl.textContent = `Rx: ${stats.total} | ${stats.rate}/s`;
         }
 
@@ -61,7 +66,7 @@ export function updateCard(id, name, rssi, stats) {
 
 export function updateRateBadge(id, total, rate) {
     requestAnimationFrame(() => {
-        const badge = document.getElementById(`badge-${id}`);
+        const badge = document.getElementById(`badge-${toSafeId(id)}`);
         if (badge) badge.textContent = `Rx: ${total} | ${rate}/s`;
     });
 }

@@ -27,8 +27,8 @@ UI.bindInputEvents(() => refreshUI());
 
 // Bind Card Clicks (Modal logic)
 UI.bindCardClick((id) => {
-    // Fetch data directly from Store
-    const deviceData = Store.getDevices().get(id);
+    // Fetch a defensive copy from Store
+    const deviceData = Store.getDeviceById(id);
     if (deviceData) {
         UI.showDetails(deviceData);
     }
