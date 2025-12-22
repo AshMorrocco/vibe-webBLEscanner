@@ -79,3 +79,11 @@ function serializeRawMap(map, isManufacturer = false) {
     });
     return obj;
 }
+
+/**
+ * Clear all devices from the store and notify listeners.
+ */
+export function clearDevices() {
+    devices.clear();
+    EventBus.dispatchEvent(new CustomEvent(EVENTS.RESET));
+}

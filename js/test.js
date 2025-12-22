@@ -1,3 +1,8 @@
+import { ReplayProvider } from './adapters/replay.js';
+import { Recorder } from './adapters/recorder.js';
+import { EventBus, EVENTS } from './core/bus.js';
+import * as Store from './core/store.js';
+
 export function runTests(isTestMode) {
     if (!isTestMode) return;
     
@@ -35,6 +40,16 @@ export function runTests(isTestMode) {
         }
     };
 
+    // Wait for an arbitrary condition to become true (timeout in ms)
+    const waitForCondition = async (fn, timeout = 2000, interval = 50) => {
+        const start = Date.now();
+        while (Date.now() - start < timeout) {
+            if (fn()) return true;
+            await new Promise(r => setTimeout(r, interval));
+        }
+        return false;
+    };
+
     const triggerInput = (id, value, eventType = 'input') => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -44,21 +59,23 @@ export function runTests(isTestMode) {
 
     // --- 3. TEST SUITE EXECUTION ---
     (async () => {
-        const btnStart = document.getElementById('btn-start');
-        const btnStop = document.getElementById('btn-stop');
+        const btnScan = document.getElementById('btn-scan-toggle');
+        const btnRecord = document.getElementById('btn-record-toggle');
+        const recordStatus = document.getElementById('record-status');
+        const stopOnSave = document.getElementById('stop-on-save');
         const grid = document.getElementById('device-grid');
 
         await waitForUI(10); 
         log("Test Suite Starting...", true);
 
         // --- TEST 1: Basic UI State ---
-        if (!btnStart.disabled && btnStop.disabled) log("Buttons in IDLE state", true);
+        if (btnScan && !btnScan.disabled) log("Buttons in IDLE state", true);
         else log("Buttons wrong state", false);
 
         // --- TEST 2: Start Scan ---
-        btnStart.click();
+        btnScan.click();
         await waitForUI(5);
-        if (btnStart.disabled) log("Scan started", true);
+        if (btnScan && btnScan.textContent.toLowerCase().includes('stop')) log("Scan started", true);
         else log("Start button failed", false);
 
         // --- TEST 3: Inject Data ---
@@ -196,10 +213,144 @@ export function runTests(isTestMode) {
         document.getElementById('modal-close').click();
         await waitForUI(5);
 
+        // --- TEST: Replay Playback (App-level) ---
+        try {
+            // Fetch replay file blob and create a File so we can use the app's file input
+            const resp = await fetch('replays/sample_session.json');
+            const blob = await resp.blob();
+            const file = new File([blob], 'sample_session.json', { type: 'application/json' });
+
+            // Stop any live scans before starting replay
+            try { btnScan.click(); } catch (e) {}
+            await waitForUI(5);
+
+            // Prevent mock listener from re-injecting packets during the replay test
+            try { mockListener = null; } catch (e) {}
+
+            // Place file into the file input using DataTransfer and fire the change event
+            const fileInput = document.getElementById('replay-file');
+            if (!fileInput) throw new Error('replay file input missing');
+
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event('change'));
+
+            // Wait for the app to load the file and enable the start button
+
+            const startReady = await waitForCondition(() => {
+                const btn = document.getElementById('btn-start-replay');
+                const name = document.getElementById('replay-file-name');
+                return btn && !btn.disabled && name && name.textContent.length > 0;
+            }, 2000, 50);
+
+            if (!startReady) { log('Replay file failed to load / start disabled', false); }
+            else log('Replay file loaded via UI', true);
+
+            // Now click the Start Replay button (this will cause the app to clear devices)
+            const startBtn = document.getElementById('btn-start-replay');
+            if (!startBtn) throw new Error('start replay button missing');
+            startBtn.click();
+
+            // Wait until a replay card appears or timeout (2s)
+            const found = await waitForCondition(() => document.getElementById('REPLAY_A') || document.getElementById('REPLAY_B'), 2000, 50);
+            if (found) log('Replay packets rendered (app start)', true);
+            else log('Replay failed: no cards after timeout', false);
+
+            // Verify previous devices are cleared or hidden
+            const oldA = document.getElementById('TEST_A');
+            if (!oldA) log('Old devices cleared', true);
+            else if (oldA.classList.contains('hidden')) log('Old devices hidden', true);
+            else log('Old devices not cleared', false);
+
+            // Verify status text reads 'Replaying'
+            const statusBadge = document.getElementById('status');
+            if (statusBadge && statusBadge.textContent.toLowerCase().includes('replay')) log('Status shows replaying', true);
+            else log('Status did not indicate replaying', false);
+
+            // Wait for UI to auto-reset to stopped state (Start Replay re-enabled)
+            const stopped = await waitForCondition(() => startBtn && !startBtn.disabled, 4000, 50);
+            if (stopped) log('Replay completion toggled UI to stopped', true);
+            else log('Replay did not toggle UI to stopped after timeout', false);
+
+        } catch (e) {
+            log('Replay test skipped: ' + e.message, false);
+        }
+
+        // --- Additional Tests: Recorder / Replay edge cases ---
+        // Recorder UI behavior
+        log("Testing Recorder UI...", true);
+        try {
+            // Ensure scanning is running
+            if (!btnScan.textContent.toLowerCase().includes('stop')) btnScan.click();
+            await waitForUI(5);
+            btnRecord.click();
+            await waitForUI(2);
+            if (btnRecord && btnRecord.textContent.toLowerCase().includes('stop') && recordStatus && recordStatus.textContent.includes('Recording')) log("Recording started UI", true);
+            else log("Recording start UI failed", false);
+
+            // Inject a packet so recorder has something to save
+            if (mockListener) {
+                mockListener({ device: { id: 'REC_A', name: 'Recorder Device' }, rssi: -60, raw: {} });
+            }
+            await waitForUI(3);
+
+            // Test stop-on-save behavior
+            stopOnSave.checked = true;
+            btnRecord.click();
+            await waitForUI(5);
+            if (btnScan && btnScan.textContent.toLowerCase().includes('start')) log("Stop-on-save stopped scanning", true);
+            else log("Stop-on-save failed", false);
+            if (recordStatus && recordStatus.textContent.includes('Saved')) log("Recording saved UI shown", true);
+            else log("Recording save UI failed", false);
+        } catch (e) {
+            log("Recorder UI test failed: " + e.message, false);
+        }
+
+        // Empty replay file handling
+        log("Testing empty replay file handling...", true);
+        try {
+            const emptyJson = JSON.stringify({ meta: {}, packets: [] });
+            const file = new File([emptyJson], 'empty.json', { type: 'application/json' });
+            const fileInput = document.getElementById('replay-file');
+            const origAlert = window.alert;
+            window.alert = () => {}; // silence alert
+            const dt2 = new DataTransfer();
+            dt2.items.add(file);
+            fileInput.files = dt2.files;
+            fileInput.dispatchEvent(new Event('change'));
+            const emptyReady = await waitForCondition(() => {
+                const btn = document.getElementById('btn-start-replay');
+                const name = document.getElementById('replay-file-name');
+                return btn && btn.disabled && name && name.textContent.includes('0 packets');
+            }, 2000, 50);
+            window.alert = origAlert;
+            if (emptyReady) log("Empty replay rejected", true);
+            else log("Empty replay not handled", false);
+        } catch (e) {
+            log("Empty replay test failed: " + e.message, false);
+        }
+
+        // Recorder truncation unit test
+        log("Testing Recorder truncation...", true);
+        try {
+            const rec = new Recorder();
+            rec.maxRecords = 3;
+            rec.start();
+            for (let i=0;i<5;i++) {
+                EventBus.dispatchEvent(new CustomEvent(EVENTS.ADVERTISEMENT, { detail: { device: { id: 'R' + i, name: 'R' + i }, rssi: -50 } }));
+            }
+            rec.stop();
+            if (rec.records.length <= 3 && rec.truncated) log("Recorder truncation enforced", true);
+            else log("Recorder truncation failed", false);
+        } catch (e) {
+            log("Recorder truncation test failed: " + e.message, false);
+        }
+
         // --- TEST 9: Stop ---
-        btnStop.click();
+        btnScan.click();
         await waitForUI(5);
-        if (!btnStart.disabled) log("Stop button reset UI", true);
+        if (!btnScan.disabled) log("Stop button reset UI", true);
         else log("Stop failed", false);
 
         log("___ DONE ___", true);
