@@ -85,7 +85,8 @@ export function runTests(isTestMode) {
             const colorInput = document.getElementById('color-hex');
             const colorApply = document.getElementById('color-apply');
             if (colorInput && colorApply) {
-                colorInput.value = '#4c6e8fff';
+                // Use a valid, 6-digit hex so apply logic can normalize and persist
+                colorInput.value = '#112233';
                 colorApply.click();
                 await new Promise(r => setTimeout(r, 50));
                 const stored = localStorage.getItem('ble-color');
@@ -370,6 +371,35 @@ export function runTests(isTestMode) {
             else log("Recording save UI failed", false);
         } catch (e) {
             log("Recorder UI test failed: " + e.message, false);
+        }
+
+        // --- NEW TEST: Auto-save when scan stops due to tab-out (unit) ---
+        log("Testing auto-save on tab-out (unit)", true);
+        try {
+            // Ensure scanning is running and recorder is started
+            if (!btnScan.textContent.toLowerCase().includes('stop')) btnScan.click();
+            await waitForUI(5);
+            // Start recording
+            btnRecord.click();
+            await waitForUI(2);
+            if (!(btnRecord && btnRecord.textContent.toLowerCase().includes('stop'))) {
+                log('Auto-save test: failed to start recording', false);
+            } else {
+                // Inject a packet so there's something to save
+                if (mockListener) mockListener({ device: { id: 'AUTO_A', name: 'Auto Device' }, rssi: -55, raw: {} });
+                await waitForUI(3);
+                // Call the exposed helper (available only in test mode)
+                if (typeof window._autoSaveActiveRecording === 'function') {
+                    window._autoSaveActiveRecording('unit test');
+                    await waitForUI(3);
+                    if (recordStatus && recordStatus.textContent.includes('Saved')) log('Auto-save saved file on tab-out', true);
+                    else log('Auto-save did not save file', false);
+                } else {
+                    log('Auto-save helper not available in test mode', false);
+                }
+            }
+        } catch (e) {
+            log('Auto-save unit test failed: ' + e.message, false);
         }
 
         // Empty replay file handling

@@ -317,9 +317,49 @@ function refreshUI() {
 }
 
 // 5. Lifecycle Management
+
+// Helper: if a recording is active, stop it and save (used when scanning stops unexpectedly)
+function _autoSaveActiveRecording(reason) {
+    try {
+        if (!recorder || !recorder.isRecording) return;
+
+        // Stop the recorder
+        recorder.stop();
+
+        // If no packets were recorded, notify and clear UI state
+        if (!recorder.records || recorder.records.length === 0) {
+            if (recordStatus) recordStatus.textContent = 'No packets recorded';
+            // Be explicit about why recording stopped
+            alert('Recording stopped due to ' + (reason || 'scan stop') + ' — no packets recorded.');
+            btnRecord.textContent = 'Start recording';
+            setTimeout(() => { if (recordStatus) recordStatus.textContent = ''; }, 2000);
+            return;
+        }
+
+        // Download the recorded file
+        const filename = `replay-${Date.now()}.json`;
+        recorder.download(filename, 'recording');
+        if (recordStatus) recordStatus.textContent = `Saved ${filename}`;
+        setTimeout(() => { if (recordStatus) recordStatus.textContent = ''; }, 3000);
+        btnRecord.textContent = 'Start recording';
+    } catch (e) {
+        console.error('Auto-save recording failed', e);
+    }
+}
+
+// Expose helper in test mode for unit tests
+if (isTestMode) window._autoSaveActiveRecording = _autoSaveActiveRecording;
+
 document.addEventListener("visibilitychange", () => { 
-    if (document.hidden && !isTestMode && rateInterval) stop(); 
+    if (document.hidden && !isTestMode && rateInterval) {
+        // If a recording is active, save it before the scan stops
+        if (recorder && recorder.isRecording) _autoSaveActiveRecording('tab hidden');
+        stop();
+    }
 });
 window.addEventListener("blur", () => { 
-    if (!isTestMode && rateInterval) stop(); 
+    if (!isTestMode && rateInterval) {
+        if (recorder && recorder.isRecording) _autoSaveActiveRecording('window blur');
+        stop();
+    }
 });
