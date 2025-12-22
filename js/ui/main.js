@@ -35,6 +35,12 @@ EventBus.addEventListener(EVENTS.DEVICE_UPDATED, (event) => {
     }
 });
 
+// Clear UI when store is reset
+EventBus.addEventListener(EVENTS.RESET, () => {
+    const gridEl = document.getElementById('device-grid');
+    if (gridEl) gridEl.innerHTML = '';
+});
+
 function refreshGrid() {
     const gridEl = document.getElementById('device-grid');
     if (!gridEl) return; // Null Safety: Don't run logic if view is missing

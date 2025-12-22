@@ -50,10 +50,21 @@ export class LiveProvider {
         }
 
         // Start passive scan
-        this.scan = await navigator.bluetooth.requestLEScan({
-            acceptAllAdvertisements: true,
-            keepRepeatedDevices: true
-        });
+        try {
+            this.scan = await navigator.bluetooth.requestLEScan({
+                acceptAllAdvertisements: true,
+                keepRepeatedDevices: true
+            });
+        } catch (e) {
+            // Fail cleanly and provide a helpful message
+            this.scan = null;
+            // Keep behavior consistent: don't leave listeners attached
+            if (this.listener) {
+                try { navigator.bluetooth.removeEventListener('advertisementreceived', this.listener); } catch (er) {}
+                this.listener = null;
+            }
+            throw new Error('Passive BLE scanning failed or was blocked (requestLEScan). Ensure you permitted Bluetooth access and enabled experimental features. (' + (e.message || e) + ')');
+        }
 
         // Handler
         this.listener = (event) => {
