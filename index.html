@@ -18,9 +18,11 @@
         <h1>BLE Monitor</h1>
         <span id="status" class="status-badge">Idle</span>
     </div>
-    <div>
-        <button id="btn-start">Start Scanner</button>
-        <button id="btn-stop" disabled>Stop</button>
+    <div style="display:flex; gap:8px; align-items:center">
+        <button id="btn-record-toggle">Start recording</button>
+        <button id="btn-scan-toggle">Start scanning</button>
+        <label style="margin-left:8px; font-size:0.8rem; color:var(--text-dim); display:flex; gap:6px; align-items:center"><input id="stop-on-save" type="checkbox"> Stop scan when saving</label>
+        <span id="record-status" style="font-size:0.8rem; color:var(--text-dim); margin-left:8px;"></span>
     </div>
 </header>
 
@@ -66,6 +68,16 @@
                 <div class="swatch" style="background:#ff9800;" data-color="#ff9800" data-bg="#4a2c00"></div>
                 <div class="swatch" style="background:#76ff03;" data-color="#76ff03" data-bg="#1b3300"></div>
             </div>
+        </div>
+        <div class="theme-row" style="margin-top:10px; padding-top:10px; border-top:1px solid #333">
+             <label style="font-size:0.8rem; color:var(--text-dim)">Replay Session</label>
+             <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                 <label id="replay-file-label" for="replay-file" class="file-btn" style="padding:6px 10px; background:var(--card-bg); cursor:pointer; border-radius:4px; font-size:0.9rem;">Load Replay</label>
+                 <input type="file" id="replay-file" accept=".json" style="display:none;">
+                 <span id="replay-file-name" style="font-size:0.8rem; color:var(--text-dim);"></span>
+                 <button id="btn-start-replay" style="padding:6px 10px; font-size:0.8rem; margin-left:auto;" disabled>Start Replay</button>
+             </div>
+
         </div>
         <div class="theme-row" style="margin-top:10px; padding-top:10px; border-top:1px solid #333">
              <a href="?test=true" style="color:var(--text-dim); text-decoration:none; font-size:0.8rem;">Run Test Suite</a>
