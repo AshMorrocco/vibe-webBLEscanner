@@ -80,6 +80,21 @@ export function runTests(isTestMode) {
         if (btnScan && !btnScan.disabled) log("Buttons in IDLE state", true);
         else log("Buttons wrong state", false);
 
+        // --- TEST 1.5: Color Input Apply ---
+        try {
+            const colorInput = document.getElementById('color-hex');
+            const colorApply = document.getElementById('color-apply');
+            if (colorInput && colorApply) {
+                colorInput.value = '#4c6e8fff';
+                colorApply.click();
+                await new Promise(r => setTimeout(r, 50));
+                const stored = localStorage.getItem('ble-color');
+                const css = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+                if (stored && stored.toUpperCase() === '#112233' && css.toUpperCase() === '#112233') log('Color apply input works', true);
+                else log('Color apply failed: ' + stored + ' / ' + css, false);
+            } else log('Color input or apply button missing', false);
+        } catch (e) { log('Color apply test error: ' + e.message, false); }
+
         // --- TEST 2: Start Scan ---
         btnScan.click();
         await waitForUI(5);
@@ -92,7 +107,6 @@ export function runTests(isTestMode) {
             mockListener({ device: { id: "TEST_Z", name: "Zebra Device" }, rssi: -90, raw: {} });
             log("Injected 2 mock devices (Alpha & Zebra)", true);
         } else log("Listener missing", false);
-
         await waitForUI(5);
 
         if (document.getElementById(toSafeId("TEST_A")) && document.getElementById(toSafeId("TEST_Z"))) {

@@ -61,12 +61,19 @@
     </button>
     <div id="settings-menu">
         <div class="theme-row"><span class="theme-label">Theme</span><button id="theme-toggle" style="padding:4px 10px; font-size:0.8rem;">Light</button></div>
-        <div class="theme-row"><span class="theme-label">Color</span>
-            <div class="color-options">
-                <div class="swatch" style="background:#03dac6;" data-color="#03dac6" data-bg="#003d33"></div>
-                <div class="swatch" style="background:#bb86fc;" data-color="#bb86fc" data-bg="#32004a"></div>
-                <div class="swatch" style="background:#ff9800;" data-color="#ff9800" data-bg="#4a2c00"></div>
-                <div class="swatch" style="background:#76ff03;" data-color="#76ff03" data-bg="#1b3300"></div>
+        <div class="theme-row">
+            <span class="theme-label">Color</span>
+            <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
+                <div class="color-input-row" style="display:flex; justify-content:flex-end; gap:8px; align-items:center;">
+                    <input id="color-hex" class="color-input" type="text" placeholder="#RRGGBB" style="padding:6px 8px; width:120px;" />
+                    <button id="color-apply" style="padding:6px 10px; font-size:0.9rem;">Apply</button>
+                </div>
+                <div class="color-options swatches-row" style="display:flex; gap:8px; justify-content:flex-end;">
+                    <div class="swatch" style="background:#03dac6;" data-color="#03dac6" data-bg="#003d33"></div>
+                    <div class="swatch" style="background:#bb86fc;" data-color="#bb86fc" data-bg="#32004a"></div>
+                    <div class="swatch" style="background:#ff9800;" data-color="#ff9800" data-bg="#4a2c00"></div>
+                    <div class="swatch" style="background:#76ff03;" data-color="#76ff03" data-bg="#1b3300"></div>
+                </div>
             </div>
         </div>
         <div class="theme-row" style="margin-top:10px; padding-top:10px; border-top:1px solid #333">

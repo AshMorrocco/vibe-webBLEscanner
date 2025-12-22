@@ -126,6 +126,8 @@ input[type="range"] {
 #settings-menu { background: var(--card-bg); border: 1px solid var(--border-dim); padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: none; flex-direction: column; gap: 12px; min-width: 150px; }
 #settings-menu.visible { display: flex; }
 .theme-row { display: flex; justify-content: space-between; align-items: center; gap: 10px;}
+.color-input { border: 1px solid var(--border-dim); background: transparent; color: var(--text-main); padding: 6px 8px; border-radius: 4px; }
+.color-input.invalid { border-color: var(--warn); }
 .swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
 .swatch:hover { transform: scale(1.1); }
 
