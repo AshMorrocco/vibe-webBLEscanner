@@ -46,6 +46,11 @@ export function setUIState(running, isTestMode = false) {
         }
     }
 
+    // Only allow recording when scanning is active
+    if (recordBtn) {
+        recordBtn.disabled = !running;
+    }
+
     if(!isTestMode && statusBadge) {
         if (running) {
             statusBadge.textContent = "Scanning Active";
