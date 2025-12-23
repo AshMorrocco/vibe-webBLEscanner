@@ -1,5 +1,7 @@
 import { EventBus, EVENTS } from './bus.js';
 import { serializeRawMap } from '../utils/raw.js';
+// U1 protocol parser
+import { parseU1RealTime } from '../logic/parsers/u1.js';
 
 // Central State (Single Source of Truth)
 const devices = new Map();
@@ -25,9 +27,6 @@ export function getDeviceById(id) {
  */
 export function upsertDevice(packet) {
     try {
-        // Diagnostic: log incoming packet shape to help test failures
-        console.debug('[Store] upsertDevice called', packet);
-
         const { device, rssi, txPower, uuids, manufacturerData, serviceData } = packet || {};
         if (!device || !device.id) {
             console.warn('[Store] upsertDevice ignored malformed packet (missing device/id)', packet);
@@ -61,15 +60,42 @@ export function upsertDevice(packet) {
                 raw: serializedRaw
             };
             devices.set(id, data);
-            console.debug('[Store] new device added', id);
+            // New device added (quiet)
         } else {
             data.rssi = rssi;
             data.lastSeen = Date.now();
             data.raw = serializedRaw;
             // Update name if we found a better one
             if (name !== 'N/A') data.name = name;
-            console.debug('[Store] device updated', id);
         }
+
+        // Parse U1-specific Service Data (if present) and append compact histories
+        try {
+            // Attempt parsing from multiple shapes: live Map, serialized serviceData, or manufacturerData
+            let parsed = null;
+            try { parsed = parseU1RealTime(serviceData); } catch (_) { parsed = null; }
+            if (!parsed) {
+                try { parsed = parseU1RealTime(serializedRaw.serviceData); } catch (_) { parsed = null; }
+            }
+            if (!parsed) {
+                try { parsed = parseU1RealTime(serializedRaw.manufacturerData); } catch (_) { parsed = null; }
+            }
+
+            // Accept both U1_REALTIME (standard) and U1_AA16 (custom) types
+            if (parsed && (parsed.type === 'U1_REALTIME' || parsed.type === 'U1_AA16')) {
+                if (!data.u1) data.u1 = { battery: [], motion: [] };
+                const ts = Date.now();
+                if (parsed.battery) {
+                    data.u1.battery.push({ t: ts, mv: parsed.battery.mv, percent: parsed.battery.percent });
+                    // Keep only recent N readings to avoid unbounded growth
+                    if (data.u1.battery.length > 120) data.u1.battery.shift();
+                }
+                if (parsed.motion) {
+                    data.u1.motion.push({ t: ts, active: parsed.motion.active, countdown: parsed.motion.countdown });
+                    if (data.u1.motion.length > 120) data.u1.motion.shift();
+                }
+            }
+        } catch (e) { /* silent - parsing failures are expected for unrelated packets */ }
         
         // 3. Update Metrics
         data.stats.total++;
@@ -77,7 +103,6 @@ export function upsertDevice(packet) {
 
         // 4. Dispatch Event (Store -> UI) — send a defensive copy
         const payload = JSON.parse(JSON.stringify(data));
-        console.debug('[Store] dispatching DEVICE_UPDATED', payload);
         EventBus.dispatchEvent(new CustomEvent(EVENTS.DEVICE_UPDATED, { 
             detail: payload 
         }));

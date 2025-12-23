@@ -1,4 +1,5 @@
 import { bufferToHex, parseRawObject } from '../../utils/raw.js';
+import { renderU1Analytics } from '../views/analytics.js';
 
 // --- Internal Helper ---
 const get = (id) => document.getElementById(id);
@@ -14,6 +15,13 @@ if (pauseBtn) pauseBtn.onclick = togglePause;
 if (modal) modal.onclick = (e) => {
     if (e.target === modal) closeModal();
 };
+
+// Small helper to format DataView -> hex
+function dvHex(dv) {
+    if (!dv || !dv.buffer) return '';
+    return bufferToHex(dv);
+}
+
 
 let currentModalId = null;
 let isPaused = false;
@@ -122,6 +130,16 @@ export function showDetails(deviceData) {
             }
             svcContainer.innerHTML = html;
         } else { svcContainer.textContent = "None"; }
+    }
+
+    // Analytics (e.g., U1 parsed history)
+    const analyticsContainer = get('modal-analytics');
+    if (analyticsContainer) {
+        if (deviceData.u1) {
+            renderU1Analytics(analyticsContainer, deviceData.u1);
+        } else {
+            analyticsContainer.textContent = 'None';
+        }
     }
 
     el.classList.remove('hidden');

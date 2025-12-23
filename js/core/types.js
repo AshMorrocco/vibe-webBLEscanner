@@ -14,6 +14,12 @@
  */
 
 /**
+ * @typedef {Object} DeviceU1
+ * @property {Array<{t:number,mv:number,percent:number}>} battery - Time series of battery readings.
+ * @property {Array<{t:number,active:boolean,countdown:number}>} motion - Time series of motion/trigger events.
+ */
+
+/**
  * @typedef {Object} Device
  * @property {string} id - The unique Bluetooth Device ID.
  * @property {string} name - The device name (or 'N/A' if not advertised).
@@ -21,4 +27,5 @@
  * @property {number} lastSeen - Timestamp (ms) of the last packet received.
  * @property {DeviceStats} stats - Reception statistics for rate calculation.
  * @property {DeviceRawData} raw - Raw Bluetooth advertising data.
+ * @property {DeviceU1} [u1] - Parsed U1 protocol data (if available) including history arrays.
  */
