@@ -34,21 +34,22 @@ export function getFilterConfig() {
     };
 }
 
-export function setUIState(running, isTestMode = false) {
+export function setUIState(running, isTestMode = false, source = 'live') {
     // Toggle scan button label instead of enabling/disabling separate start/stop buttons
     if (scanBtn) {
         if (running) {
             scanBtn.textContent = 'Stop scanning';
-            scanBtn.disabled = false;
+            // Disable scan button during replay (can't start live scan while replaying)
+            scanBtn.disabled = source === 'replay';
         } else {
             scanBtn.textContent = 'Start scanning';
             scanBtn.disabled = false;
         }
     }
 
-    // Only allow recording when scanning is active
+    // Only allow recording when live scanning is active (not during replay)
     if (recordBtn) {
-        recordBtn.disabled = !running;
+        recordBtn.disabled = !running || source === 'replay';
     }
 
     if(!isTestMode && statusBadge) {

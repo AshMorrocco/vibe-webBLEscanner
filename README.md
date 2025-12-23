@@ -11,11 +11,12 @@ Built with Vanilla JavaScript (ES Modules), HTML5, and CSS3. No build tools or e
 * **Filtering & Sorting:**
     * Filter by Name, UUID, or Minimum Signal Strength (RSSI Slider).
     * Sort by Signal, Last Seen, Name, or Packet Rate.
+* **Beacon Analytics:** Click any device card to view detailed analytics including battery voltage, signal trends, and motion state for supported beacon types (U1 Real-Time and compatible formats).
 * **Theming:** Built-in Dark/Light mode and dynamic color accent picker.
 * **Zero Dependencies:** Runs entirely on standard browser APIs.
 * **Smart Compatibility Check:** Proactively detects if your browser supports Web Bluetooth and if the required flags are enabled, offering instant fix instructions.
-* **Replay Playback:** Load a saved replay (.json) from Settings → Load Replay, then Start Replay to play back packets and visualize them in the UI.
-* **Recording & Save:** Start recording from the header control to capture advertisements and Stop & Save to download a replay file. The Recorder enforces a safety cap (default 10k packets).
+* **Replay Playback:** Load a saved replay (.json) from Settings → Load Replay, then Start Replay to play back packets. During replay, live scanning and recording controls are automatically disabled to prevent interference.
+* **Recording & Save:** Start recording from the header control to capture advertisements and Stop & Save to download a replay file. The Recorder enforces a safety cap (default 10k packets). Recordings auto-save if the scan stops due to tab visibility changes.
 * **Modular Architecture:** Built on an Event-Driven (Pub/Sub) architecture with strict separation of Logic, State, and UI for high reliability and easy extensibility.
 
 ## 🚀 Getting Started

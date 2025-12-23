@@ -86,12 +86,12 @@ export function runTests(isTestMode) {
             const colorApply = document.getElementById('color-apply');
             if (colorInput && colorApply) {
                 // Use a valid, 6-digit hex so apply logic can normalize and persist
-                colorInput.value = '#112233';
+                colorInput.value = '#3d6185';
                 colorApply.click();
                 await new Promise(r => setTimeout(r, 50));
                 const stored = localStorage.getItem('ble-color');
                 const css = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-                if (stored && stored.toUpperCase() === '#112233' && css.toUpperCase() === '#112233') log('Color apply input works', true);
+                if (stored && stored.toUpperCase() === '#3D6185' && css.toUpperCase() === '#3D6185') log('Color apply input works', true);
                 else log('Color apply failed: ' + stored + ' / ' + css, false);
             } else log('Color input or apply button missing', false);
         } catch (e) { log('Color apply test error: ' + e.message, false); }
@@ -342,6 +342,67 @@ export function runTests(isTestMode) {
             if (resumed) log('Resume continued playback', true);
             else log('Resume failed to continue playback (events: ' + events.length + ')', false);
         } catch (e) { log('ReplayProvider pause/resume test failed: ' + e.message, false); }
+
+        // --- TEST: Replay Button Disable (Scan & Record disabled during replay) ---
+        log("Testing replay button disable UI state...", true);
+        try {
+            // Fetch replay file
+            const resp = await fetch('replays/sample_session.json');
+            const blob = await resp.blob();
+            const file = new File([blob], 'sample_session.json', { type: 'application/json' });
+
+            // Stop any live scans
+            try { if (btnScan.textContent.toLowerCase().includes('stop')) btnScan.click(); } catch (e) {}
+            await waitForUI(5);
+            mockListener = null; // prevent mock listener from interfering
+
+            // Load replay file
+            const fileInput = document.getElementById('replay-file');
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event('change'));
+
+            // Wait for start button to be enabled
+            const fileLoaded = await waitForCondition(() => {
+                const btn = document.getElementById('btn-start-replay');
+                return btn && !btn.disabled;
+            }, 2000, 50);
+
+            if (!fileLoaded) {
+                log('Replay file failed to load', false);
+            } else {
+                // At this point, replay is loaded but not started
+                // Scan button should be enabled
+                if (!btnScan.disabled) log('Scan enabled while replay loaded (not started)', true);
+                else log('Scan wrongly disabled before replay starts', false);
+
+                // Start replay
+                const startBtn = document.getElementById('btn-start-replay');
+                startBtn.click();
+                await waitForUI(5);
+
+                // Now replay is running - scan and record should be DISABLED
+                if (btnScan.disabled) log('Scan disabled during replay', true);
+                else log('Scan not disabled during replay (BUG)', false);
+
+                if (btnRecord.disabled) log('Record disabled during replay', true);
+                else log('Record not disabled during replay (BUG)', false);
+
+                // Wait for replay to finish
+                const replayDone = await waitForCondition(() => startBtn && !startBtn.disabled, 4000, 50);
+                if (replayDone) {
+                    // After replay ends, buttons should be re-enabled
+                    await waitForUI(3);
+                    if (!btnScan.disabled) log('Scan re-enabled after replay ends', true);
+                    else log('Scan wrongly disabled after replay ends', false);
+                } else {
+                    log('Replay did not finish in time', false);
+                }
+            }
+        } catch (e) {
+            log('Replay button disable test failed: ' + e.message, false);
+        }
 
         // --- Additional Tests: Recorder / Replay edge cases ---
         // Recorder UI behavior

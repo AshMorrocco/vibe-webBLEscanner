@@ -252,8 +252,8 @@ if (btnStartReplay) btnStartReplay.addEventListener('click', async () => {
         // Start replay; provide Store.upsertDevice as callback so Store is updated directly
         await provider.start((packet) => Store.upsertDevice(packet), { playbackRate: 1.0, loop: false });
 
-        // Update UI state and start the rate interval
-        UI.setUIState(true, isTestMode);
+        // Update UI state with 'replay' source to disable scan/record buttons
+        UI.setUIState(true, isTestMode, 'replay');
         // If this is a ReplayProvider, show a specialized badge
         const badge = document.getElementById('status');
         if (provider instanceof ReplayProvider && badge) badge.textContent = 'Replaying Scan';
@@ -287,8 +287,8 @@ EventBus.addEventListener(EVENTS.SCAN_STATUS, (event) => {
     if (detail.running === false) {
         stop();
     } else if (detail.running === true && detail.source === 'replay') {
-        // Show specialized status for replay
-        UI.setUIState(true, isTestMode);
+        // Show specialized status for replay, disable scan/record buttons
+        UI.setUIState(true, isTestMode, 'replay');
         const badge = document.getElementById('status');
         if (badge) badge.textContent = 'Replaying Scan';
         // Ensure start button disabled while replay is running

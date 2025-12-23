@@ -30,13 +30,30 @@ export function hexToDataView(hexStr) {
  * If isManufacturer is true, keys are formatted as 0xFFFF.
  */
 export function serializeRawMap(map, isManufacturer = false) {
-    if (!map || map.size === 0) return {};
-    const obj = {};
-    map.forEach((dataView, key) => {
-        const keyStr = isManufacturer ? ('0x' + Number(key).toString(16).toUpperCase().padStart(4, '0')) : key;
-        obj[keyStr] = bufferToHex(dataView);
-    });
-    return obj;
+    if (!map) return {};
+
+    // If it's already a Map (typical in live Web Bluetooth events)
+    if (map instanceof Map) {
+        if (map.size === 0) return {};
+        const obj = {};
+        map.forEach((dataView, key) => {
+            const keyStr = isManufacturer ? ('0x' + Number(key).toString(16).toUpperCase().padStart(4, '0')) : key;
+            obj[keyStr] = bufferToHex(dataView);
+        });
+        return obj;
+    }
+
+    // If it's a plain object (already serialized or coming from other platforms), convert DataViews to hex
+    if (typeof map === 'object') {
+        const obj = {};
+        Object.entries(map).forEach(([key, value]) => {
+            const keyStr = isManufacturer ? (key.toString().startsWith('0x') ? key : ('0x' + Number(key).toString(16).toUpperCase().padStart(4, '0'))) : key;
+            obj[keyStr] = (typeof value === 'string') ? value : bufferToHex(value);
+        });
+        return obj;
+    }
+
+    return {};
 }
 
 /**
