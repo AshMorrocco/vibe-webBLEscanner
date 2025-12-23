@@ -56,7 +56,7 @@ export function upsertDevice(packet) {
                 name, 
                 rssi, 
                 lastSeen: Date.now(), 
-                stats: { total: 0, bucket: 0, rate: 0 },
+                stats: { total: 0, bucket: 0, rate: 0, rssiMin: rssi, rssiMax: rssi },
                 raw: serializedRaw
             };
             devices.set(id, data);
@@ -67,6 +67,9 @@ export function upsertDevice(packet) {
             data.raw = serializedRaw;
             // Update name if we found a better one
             if (name !== 'N/A') data.name = name;
+            // Track min/max RSSI values
+            data.stats.rssiMin = Math.min(data.stats.rssiMin, rssi);
+            data.stats.rssiMax = Math.max(data.stats.rssiMax, rssi);
         }
 
         // Parse U1-specific Service Data (if present) and append compact histories

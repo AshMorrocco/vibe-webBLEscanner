@@ -1,6 +1,4 @@
 - [ ] Add meta data total Ads/s and over time, maybe a graph
-- [ ] update RSSI bar to reflect min and max values
-
 
 ## Probably wont do
 - [ ] Add "Clear List" / "Forget Devices" button
@@ -17,3 +15,4 @@ Just refresh the page mate
 - [x] compatibility check and warning
 - [x] Custom hex color input
 - [x] Add Data Export (Download CSV/JSON of scan session)
+- [x] update RSSI bar to reflect min and max values

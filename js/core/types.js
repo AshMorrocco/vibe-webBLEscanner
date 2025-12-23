@@ -3,6 +3,8 @@
  * @property {number} total - Total number of advertisement packets received.
  * @property {number} bucket - Number of packets received in the current calculation interval.
  * @property {number} rate - Calculated packets per second (Ads/s).
+ * @property {number} rssiMin - Minimum RSSI value observed for this device.
+ * @property {number} rssiMax - Maximum RSSI value observed for this device.
  */
 
 /**

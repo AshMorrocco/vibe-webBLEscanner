@@ -10,7 +10,7 @@
  * @param {number} [config.minRssi] - Minimum RSSI threshold (e.g. -100).
  * @param {string} [config.filterText] - Search string.
  * @param {'name'|'id'} [config.filterType] - Which field to search against.
- * @param {'rssi'|'lastSeen'|'rate'|'total'|'name'} [config.sortType] - Field to sort by.
+ * @param {'rssi'|'lastSeen'|'rate'|'total'|'delta'|'name'} [config.sortType] - Field to sort by.
  * @param {'asc'|'desc'} [config.sortOrder] - Sort direction.
  * @returns {Device[]} An array of Device objects that match the criteria, sorted.
  */
@@ -56,6 +56,10 @@ export function getSortedAndFilteredList(devicesMap, config) {
                 break;
             case 'total': 
                 valA = a.stats.total; valB = b.stats.total; 
+                break;
+            case 'delta':
+                valA = Math.abs((a.stats.rssiMax ?? 0) - (a.stats.rssiMin ?? -100));
+                valB = Math.abs((b.stats.rssiMax ?? 0) - (b.stats.rssiMin ?? -100));
                 break;
             case 'name': 
                 valA = (a.name || '').toLowerCase(); 

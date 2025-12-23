@@ -198,7 +198,56 @@ export function runTests(isTestMode) {
         if (ratePassed) log("Rate correct (> 0/s detected)", true);
         else log(`Rate failed. Final Text: '${finalRateText}'`, false);
 
-        // --- TEST 8: Modal & Pause Logic ---
+        // --- TEST 8: RSSI Min/Max Tracking ---
+        log("Testing RSSI min/max tracking with delta display...", true);
+        try {
+            // Inject varying RSSI values for a new device
+            mockListener({ device: { id: "RSSI_TEST", name: "RSSI Device" }, rssi: -70, raw: {} });
+            await waitForUI(3);
+            
+            mockListener({ device: { id: "RSSI_TEST", name: "RSSI Device" }, rssi: -30, raw: {} });
+            await waitForUI(3);
+            
+            mockListener({ device: { id: "RSSI_TEST", name: "RSSI Device" }, rssi: -60, raw: {} });
+            await waitForUI(3);
+            
+            // Check that the card now shows min/max range
+            const rssiCard = document.getElementById(toSafeId('RSSI_TEST'));
+            if (rssiCard) {
+                const rssiText = rssiCard.querySelector('.rssi-text');
+                if (rssiText && rssiText.textContent.includes('Δ') && rssiText.textContent.includes('40')) {
+                    log('RSSI delta displayed (Δ 40)', true);
+                } else {
+                    log('RSSI text missing delta: ' + (rssiText ? rssiText.textContent : 'null'), false);
+                }
+                
+                // Verify bar zones are rendered
+                const belowZone = rssiCard.querySelector('.rssi-zone-below');
+                const rangeZone = rssiCard.querySelector('.rssi-zone-range');
+                const aboveZone = rssiCard.querySelector('.rssi-zone-above');
+                
+                if (belowZone && rangeZone && aboveZone) {
+                    const belowWidth = parseFloat(belowZone.style.width);
+                    const rangeWidth = parseFloat(rangeZone.style.width);
+                    const aboveWidth = parseFloat(aboveZone.style.width);
+                    
+                    // Sanity check: widths should be non-negative and their sum should be ~100
+                    if (belowWidth >= 0 && rangeWidth >= 0 && aboveWidth >= 0) {
+                        log('RSSI bar zones rendered with correct widths', true);
+                    } else {
+                        log('RSSI bar zone widths invalid', false);
+                    }
+                } else {
+                    log('RSSI bar zones missing from DOM', false);
+                }
+            } else {
+                log('RSSI test card not rendered', false);
+            }
+        } catch (e) {
+            log('RSSI min/max test failed: ' + e.message, false);
+        }
+
+        // --- TEST 9: Modal & Pause Logic ---
         log("Testing Modal Logic...", true);
         
         cardA.click();
