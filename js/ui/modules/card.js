@@ -1,10 +1,11 @@
 import { toSafeId } from '../../utils/raw.js';
+import { detectDeviceType } from '../../utils/helpers.js';
 
 /**
- * Renders/Updates a single device card with RSSI bar showing min/max zones.
+ * Renders/Updates a single device card with device type and RSSI bar showing min/max zones.
  * Null-safe: Checks if the grid and card elements exist before writing.
  */
-export function updateCard(id, name, rssi, stats) {
+export function updateCard(id, name, rssi, stats, device = null) {
     // Schedule UI update for the next animation frame
     requestAnimationFrame(() => {
         const grid = document.getElementById('device-grid');
@@ -26,7 +27,7 @@ export function updateCard(id, name, rssi, stats) {
                     <span class="device-name"></span>
                     <span class="packet-count"></span>
                 </div>
-                <div class="card-center">${id}</div>
+                <div class="card-type"></div>
                 <div class="rssi-container">
                     <div class="meter">
                         <div class="rssi-zone-below"></div>
@@ -41,6 +42,7 @@ export function updateCard(id, name, rssi, stats) {
         // B. Select specific elements
         const nameEl = card.querySelector('.device-name');
         const countEl = card.querySelector('.packet-count');
+        const typeEl = card.querySelector('.card-type');
         const belowEl = card.querySelector('.rssi-zone-below');
         const rangeEl = card.querySelector('.rssi-zone-range');
         const aboveEl = card.querySelector('.rssi-zone-above');
@@ -62,6 +64,17 @@ export function updateCard(id, name, rssi, stats) {
         if (countEl) {
             if (!countEl.id) countEl.id = `badge-${safeId}`;
             countEl.textContent = `Rx: ${stats.total} | ${stats.rate}/s`;
+        }
+
+        // Update device type display with optional battery info
+        if (typeEl && device) {
+            const typeInfo = detectDeviceType(device);
+            let typeContent = typeInfo.type;
+            if (typeInfo.battery) {
+                const batteryPct = Math.round(typeInfo.battery.percent);
+                typeContent += ` · ${batteryPct}%`;
+            }
+            typeEl.textContent = typeContent;
         }
 
         // Update RSSI bar zones

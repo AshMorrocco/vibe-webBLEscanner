@@ -24,7 +24,7 @@ EventBus.addEventListener(EVENTS.DEVICE_UPDATED, (event) => {
     const device = event.detail;
 
     // A. Visual Update (Granular)
-    Card.updateCard(device.id, device.name, device.rssi, device.stats);
+    Card.updateCard(device.id, device.name, device.rssi, device.stats, device);
 
     // B. List Order Update (Full Refresh)
     // We only re-sort/filter if the Grid exists
